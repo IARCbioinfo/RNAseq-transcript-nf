@@ -134,9 +134,9 @@ process StringTie2ndpass {
 
 	output: 
 	file("${file_tag}_gene_abund.tab") into tabs
-	file("*.csv") into csvs
+	file("*.ctab") into ctabs
 	file("${file_tag}_merged.gtf") into gtf_merged
-	publishDir "${params.output_folder}", mode: 'copy'
+	publishDir "${params.output_folder}/${file_tag}", mode: 'copy'
 
 	shell:
 	file_tag=bam.baseName
