@@ -110,6 +110,7 @@ process mergeGTF {
 
 	output: 
 	file("stringtie_merged.gtf") into merged_gtf
+	file("gffcmp_merged*") into gffcmp_output
 	publishDir "${params.output_folder}", mode: 'copy', pattern: '{gffcmp_merged*}' 
 
 	shell:
