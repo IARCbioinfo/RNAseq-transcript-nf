@@ -110,11 +110,13 @@ process mergeGTF {
 
 	output: 
 	file("stringtie_merged.gtf") into merged_gtf
+	publishDir "${params.output_folder}", mode: 'copy', pattern: '{gffcmp_merged*}' 
 
 	shell:
 	'''
 	ls *_ST.gtf > mergelist.txt
 	stringtie --merge -p !{params.cpu} -G !{gtf} -o stringtie_merged.gtf mergelist.txt
+	gffcompare -r !{gtf} -G -o gffcmp_merged stringtie_merged.gtf
 	'''
 }
 
@@ -138,7 +140,6 @@ process StringTie2ndpass {
 	shell:
 	file_tag=bam.baseName
 	'''
-	gffcompare -r !{gtf} -G -o !{file_tag} !{file_tag}.gtf
 	stringtie -e -B -p !{params.cpu} -G !{merged_gtf} -o !{file_tag}_merged.gtf -A !{file_tag}_gene_abund.tab !{file_tag}.bam
 	'''
 }
