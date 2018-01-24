@@ -22,7 +22,7 @@ params.input_folder = '.'
 params.output_folder= "."
 params.mem  = 2
 params.cpu  = 2
-params.gtf  = 2
+params.gtf  = null
 
 params.help = null
 
@@ -138,7 +138,6 @@ process StringTie2ndpass {
 	shell:
 	file_tag=bam.baseName
 	'''
-	ls *_ST.gtf > mergelist.txt
 	gffcompare -r !{gtf} -G -o !{file_tag} !{file_tag}.gtf
 	stringtie -e -B -p !{params.cpu} -G !{merged_gtf} -o !{file_tag}_merged.gtf -A !{file_tag}_gene_abund.tab !{file_tag}.bam
 	'''
