@@ -23,31 +23,24 @@ You can avoid installing all the external software by only installing Docker. Se
   Specify the test files location
 
 ## Parameters
-
-  * #### Mandatory
+* #### Mandatory
 | Name      | Example value | Description     |
 |-----------|---------------|-----------------| 
-| --param1    |            xx | ...... |
-| --param2    |            xx | ...... |
-  
+| --gtf    |  ref_annot.gtf  | annotation .gtf file |
+
+
   * #### Optional
 | Name      | Default value | Description     |
 |-----------|---------------|-----------------| 
-| --param3   |            xx | ...... |
-| --param4    |            xx | ...... |
+| --output_folder |      . | folder where output is written |
+| --mem  | 2 | memory |
+| --cpu  | 2 | number of CPUs | 
 
-  * #### Flags
-  
-Flags are special parameters without value.
-
-| Name      | Description     |
-|-----------|-----------------| 
-| --help    | Display help |
 
 	
 ## Usage 
   ```
-  
+  nextflow run iarcbioinfo/RNAseq-transcript-nf --input_folder BAM/ --output_folder out --gtf ref_annot.gtf
   ```
   
 ## Output 
@@ -57,8 +50,11 @@ Flags are special parameters without value.
   | output2    | ...... |
 
 
-## Detailed description (optional section)
-...
+## Detailed description
+This workflow involves 3 steps:
+- a 1st pass identifies new transcripts for each BAM file
+- a merging step merges the list of transcripts of each BAM file
+- a 2nd pass quantifies transcripts from the merged file (without new transcript discovery) in each sample
 
 ## Directed Acyclic Graph
 [![DAG](dag.png)](http://htmlpreview.github.io/?https://github.com/IARCbioinfo/template-nf/blob/master/dag.html)
