@@ -44,10 +44,13 @@ You can avoid installing all the external software by only installing Docker. Se
   ```
   
 ## Output 
-  | Type      | Description     |
-  |-----------|---------------|
-  | output1    | ...... |
-  | output2    | ...... |
+The output include usual StringTie outputs (see detailed description at https://github.com/gpertea/stringtie):
+- an annotation file with the discovered and known transcripts (gffcmp_merged.annotated.gtf), along with information about naming (gffcmp_merged.stringtie_merged.gtf.refmap, gffcmp_merged.tracking) and positions (gffcmp_merged.loci, gffcmp_merged.stringtie_merged.gtf.tmap), and some statistics (gffcmp_merged.stats)
+
+In addition, a folder is created for each sample, with:
+- an expression quantification file (\*_gene_abund.tab) with FPKM and TPM
+- an annotation file (\*_merged.gtf)
+- Ballgown input files for statistical analysis using R package ballgown (exon/transcript and intron/transcript ids correspondance e2t.ctab and i2t.ctab, exon, intron, and transcript-level quantification files e_data.ctab, i_data.ctab, and t_data.ctab) 
 
 
 ## Detailed description
