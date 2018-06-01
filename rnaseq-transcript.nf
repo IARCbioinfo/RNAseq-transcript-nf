@@ -90,19 +90,21 @@ process StringTie1stpass {
 	
 	output:
 	file("${file_tag}_ST.gtf") into STgtfs
-	if( params.twopass == null ){
-      	    publishDir "${params.output_folder}/${file_tag}", mode: 'copy'
-	}
+	
 	shell:
+	file_tag=bam.baseName
 	if(params.twopass==null){
 	  STopts=''
 	}else{
 	  STopts="-e -B -A !{file_tag}_pass1_gene_abund.tab "
 	}
-	file_tag=bam.baseName
     	'''
     	stringtie !{STopts} -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag} !{file_tag}.bam
     	'''
+	
+	if( params.twopass == null ){
+      	    publishDir "${params.output_folder}/${file_tag}", mode: 'copy'
+	}
 }
 
 if(params.twopass){
