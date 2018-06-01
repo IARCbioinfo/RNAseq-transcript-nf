@@ -1,7 +1,5 @@
 #! /usr/bin/env nextflow
 
-//vim: syntax=groovy -*- mode: groovy;-*-
-
 // Copyright (C) 2017 IARC/WHO
 
 // This program is free software: you can redistribute it and/or modify
@@ -23,6 +21,8 @@ params.output_folder= "."
 params.mem  = 2
 params.cpu  = 2
 params.gtf  = null
+
+params.twopass  = null
 
 params.help = null
 
@@ -90,14 +90,22 @@ process StringTie1stpass {
 	
 	output:
 	file("${file_tag}_ST.gtf") into STgtfs
-    
+	if( params.twopass == null ){
+      	    publishDir "${params.output_folder}/${file_tag}", mode: 'copy'
+	}
 	shell:
+	if(params.twopass==null){
+	  STopts=''
+	}else{
+	  STopts="-e -B -A !{file_tag}_pass1_gene_abund.tab "
+	}
 	file_tag=bam.baseName
     	'''
-    	stringtie  !{file_tag}.bam -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag}
+    	stringtie !{STopts} -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag} !{file_tag}.bam
     	'''
 }
 
+if(params.twopass){
 // Merges the list of transcripts of each BAM file
 process mergeGTF {
 	cpus params.cpu
@@ -144,4 +152,4 @@ process StringTie2ndpass {
 	stringtie -e -B -p !{params.cpu} -G !{merged_gtf} -o !{file_tag}_merged.gtf -A !{file_tag}_gene_abund.tab !{file_tag}.bam
 	'''
 }
-
+}
