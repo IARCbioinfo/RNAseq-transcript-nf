@@ -68,9 +68,10 @@ if (params.help) {
 
 if (file(params.input_folder).listFiles().findAll { it.name ==~ /.*bam/ }.size() > 0){
        println "BAM files found, proceed with transcript quantification"; mode ='bam'
-       bam_files = Channel.fromPath( params.input_folder+'/*.bam'
-       //bai_files = Channel.fromPath( params.input_folder+'/*.bai'
-       )
+       bam_files = Channel.fromPath( params.input_folder+'/*.bam')
+                          .map{ path -> [ path.name.replace(".bam",""), path ] }
+			  .view()
+      
 }else{
        println "ERROR: input folder contains no fastq nor BAM files"; System.exit(1)
 }
@@ -85,26 +86,32 @@ process StringTie1stpass {
 	tag { file_tag }
 
 	input:
-	file bam from bam_files_41stpass
+	set file_tag, file(bam) from bam_files_41stpass
 	file gtf
 	
 	output:
 	file("${file_tag}_ST.gtf") into STgtfs
+	file("${file_tag}") optional true into outbg
+	file("*_gene_abund.tab") optional true into outtab
 	
+	publishDir "${params.output_folder}", mode: 'copy'
+
 	shell:
-	file_tag=bam.baseName
+	//file_tag=bam.baseName
 	if(params.twopass==null){
-	  STopts=''
+	  STopts="-e -B -A ${file_tag}_pass1_gene_abund.tab "
 	}else{
-	  STopts="-e -B -A !{file_tag}_pass1_gene_abund.tab "
+	  STopts=" "
 	}
     	'''
     	stringtie !{STopts} -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag} !{file_tag}.bam
+	mkdir !{file_tag}
+	mv *.ctab !{file_tag}/.
     	'''
-	
-	if( params.twopass == null ){
-      	    publishDir "${params.output_folder}/${file_tag}", mode: 'copy'
-	}
+	//if( params.twopass == null ){
+        //    publishDir "${params.output_folder}", mode: 'copy'
+        //}
+
 }
 
 if(params.twopass){
@@ -138,7 +145,7 @@ process StringTie2ndpass {
 	tag { file_tag }
 
 	input:
-	file bam from bam_files_42ndpass
+	set file_tag, file(bam) from bam_files_42ndpass
 	file merged_gtf
 	file gtf
 
