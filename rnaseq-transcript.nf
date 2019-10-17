@@ -17,19 +17,22 @@
 
 
 params.input_folder = '.'
+params.input_file = null
 params.output_folder= "."
 params.mem  = 2
 params.cpu  = 2
 params.gtf  = null
+params.prepDE_input = 'NO_FILE'
 
 params.twopass  = null
 
 params.help = null
 
 log.info ""
-log.info "--------------------------------------------------------"
-log.info "  <PROGRAM_NAME> <VERSION>: <SHORT DESCRIPTION>         "
-log.info "--------------------------------------------------------"
+log.info "-----------------------------------------------------------------"
+log.info "RNAseq-transcript-nf 2.0.0: gene- and transcript-level           "
+log.info "expression quantification from RNA sequencing data with StringTie"
+log.info "-----------------------------------------------------------------"
 log.info "Copyright (C) IARC/WHO"
 log.info "This program comes with ABSOLUTELY NO WARRANTY; for details see LICENSE"
 log.info "This is free software, and you are welcome to redistribute it"
@@ -45,27 +48,35 @@ if (params.help) {
     log.info "nextflow run iarcbioinfo/rnaseq-transcript-nf [-with-docker] [OPTIONS]"
     log.info ""
     log.info "Mandatory arguments:"
-    log.info '    --input_folder   FOLDER                  Folder containing BAM or fastq files to be aligned.'
-    log.info '    --gtf          FILE                    Annotation file.'
+    log.info '    --input_folder   FOLDER                  Folder containing RNA-seq BAM files whose expression to quantify.'
+    log.info '    --gtf            FILE                    Annotation file.'
     log.info ""
     log.info "Optional arguments:"
-    log.info '    --output_folder     STRING                Output folder (default: results_alignment).'
-    log.info '    --cpu          INTEGER                 Number of cpu used by bwa mem and sambamba (default: 2).'
-    log.info '    --mem          INTEGER                 Size of memory used for mapping (in GB) (default: 2).' 
+	log.info '    --input_file     FILE                    File in TSV format containing ID and BAM names.'
+    log.info '    --output_folder  STRING                  Output folder (default: results_alignment).'
+    log.info '    --cpu            INTEGER                 Number of cpu used by bwa mem and sambamba (default: 2).'
+    log.info '    --mem            INTEGER                 Size of memory used for mapping (in GB) (default: 2).' 
     log.info ""
     log.info "Flags:"
-    log.info "--<FLAG>                                                    <DESCRIPTION>"
+    log.info "--twopass                                    Enable StringTie 2pass mode"
     log.info ""
     exit 0
 } else {
 /* Software information */
-   log.info "input_folder = ${params.input_folder}"
-   log.info "cpu          = ${params.cpu}"
-   log.info "mem          = ${params.mem}"
-   log.info "output_folder= ${params.output_folder}"
-   log.info "help:                               ${params.help}"
+   log.info "input_folder   = ${params.input_folder}"
+   log.info "input_file     = ${params.input_file}"
+   log.info "cpu            = ${params.cpu}"
+   log.info "mem            = ${params.mem}"
+   log.info "output_folder  = ${params.output_folder}"
+   log.info "gtf            = ${params.gtf}"
+   log.info "help:            ${params.help}"
 }
 
+if(params.input_file){
+	bam_files = Channel.fromPath("${params.input_file}")
+     	   .splitCsv( header: true, sep: '\t', strip: true )
+	       .map { row -> [ row.ID , file(row.bam) ] }
+}else{
 if (file(params.input_folder).listFiles().findAll { it.name ==~ /.*bam/ }.size() > 0){
        println "BAM files found, proceed with transcript quantification"; mode ='bam'
        bam_files = Channel.fromPath( params.input_folder+'/*.bam')
@@ -75,9 +86,13 @@ if (file(params.input_folder).listFiles().findAll { it.name ==~ /.*bam/ }.size()
 }else{
        println "ERROR: input folder contains no fastq nor BAM files"; System.exit(1)
 }
+}
 
 gtf = file(params.gtf)
 bam_files.into { bam_files_41stpass; bam_files_42ndpass }
+
+//input file for the prepDE python script
+ch_prepDE_input = file(params.prepDE_input)
 
 // 1st pass identifies new transcripts for each BAM file
 process StringTie1stpass {
@@ -90,14 +105,11 @@ process StringTie1stpass {
 	file gtf
 	
 	output:
-	file("${file_tag}_ST.gtf") into STgtfs
-	file("${file_tag}") optional true into outbg
-	file("*_gene_abund.tab") optional true into outtab
-	
+	file("${file_tag}") optional true into ST_out
+	file ".command.log" into stringtie_log
 	publishDir "${params.output_folder}", mode: 'copy'
 
 	shell:
-	//file_tag=bam.baseName
 	if(params.twopass==null){
 	  STopts="-e -B -A ${file_tag}_pass1_gene_abund.tab "
 	}else{
@@ -105,15 +117,14 @@ process StringTie1stpass {
 	}
     	'''
     	stringtie !{STopts} -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag} !{file_tag}.bam
-	mkdir !{file_tag}
-	mv *.ctab !{file_tag}/.
+		mkdir !{file_tag}
+		mv *tab !{file_tag}/
+		mv *_ST.gtf !{file_tag}/
     	'''
-	//if( params.twopass == null ){
-        //    publishDir "${params.output_folder}", mode: 'copy'
-        //}
-
 }
 
+ST_out_final = Channel.create()
+ST_out_final4bg = Channel.create()
 if(params.twopass){
 // Merges the list of transcripts of each BAM file
 process mergeGTF {
@@ -122,7 +133,7 @@ process mergeGTF {
 	tag { "merge" }
 
 	input:
-	file gtfs from STgtfs.collect()
+	file gtfs from ST_out.collect()
 	file gtf
 
 	output: 
@@ -132,7 +143,7 @@ process mergeGTF {
 
 	shell:
 	'''
-	ls *_ST.gtf > mergelist.txt
+	ls */*_ST.gtf > mergelist.txt
 	stringtie --merge -p !{params.cpu} -G !{gtf} -o stringtie_merged.gtf mergelist.txt
 	gffcompare -r !{gtf} -G -o gffcmp_merged stringtie_merged.gtf
 	'''
@@ -150,15 +161,58 @@ process StringTie2ndpass {
 	file gtf
 
 	output: 
-	file("${file_tag}_gene_abund.tab") into tabs
-	file("*.ctab") into ctabs
-	file("${file_tag}_merged.gtf") into gtf_merged
-	publishDir "${params.output_folder}/${file_tag}", mode: 'copy'
+	file("${file_tag}") into ST_out2
+	file ".command.log" into stringtie_log_2pass
+	publishDir "${params.output_folder}/", mode: 'copy'
 
 	shell:
 	file_tag=bam.baseName
 	'''
-	stringtie -e -B -p !{params.cpu} -G !{merged_gtf} -o !{file_tag}_merged.gtf -A !{file_tag}_gene_abund.tab !{file_tag}.bam
+	stringtie -e -B -p !{params.cpu} -G !{merged_gtf} -o !{file_tag}_ST_2pass.gtf -A !{file_tag}_gene_abund.tab !{file_tag}.bam
+	mkdir !{file_tag}
+	mv *tab !{file_tag}/
+	mv *_ST_2pass.gtf !{file_tag}/
 	'''
 }
+ST_out2.into( ST_out_final, ST_out_final4bg)
+}else{ 
+	ST_out.into( ST_out_final, ST_out_final4bg)
+}
+
+process prepDE {
+	cpus params.cpu
+	memory params.mem +'G'
+
+	input:
+	file ST_outs from ST_out_final.collect()
+	file samplenames from ch_prepDE_input
+
+	output: 
+	file("*count_matrix.csv") into count_matrices
+	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
+
+	shell:
+	input = samplenames.name != 'NO_FILE' ? "$samplenames" : '.'
+	'''
+	prepDE.py -i !{input}
+	'''
+}
+
+process ballgown_create {
+	cpus params.cpu
+	memory params.mem +'G'
+
+	input:
+	file ST_outs from ST_out_final4bg.collect()
+	file samplenames from ch_prepDE_input
+
+	output: 
+	file("*_matrix.csv") into FPKM_matrices
+	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
+
+	shell:
+	input = samplenames.name != 'NO_FILE' ? "$samplenames" : '.'
+	'''
+	Rscript !{baseDir}/bin/create_matrices.R
+	'''
 }

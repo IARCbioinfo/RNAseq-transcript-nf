@@ -5,3 +5,4 @@ channels:
   - defaults
 dependencies:
   - stringtie=2.0
+  - bioconductor-ballgown=2.12.0
