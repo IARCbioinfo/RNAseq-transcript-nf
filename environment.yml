@@ -1,0 +1,7 @@
+name: rnaseq-transcript
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - stringtie=2.0
