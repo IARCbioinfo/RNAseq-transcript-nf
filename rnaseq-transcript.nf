@@ -53,7 +53,7 @@ if (params.help) {
     log.info '    --gtf            FILE                    Annotation file.'
     log.info ""
     log.info "Optional arguments:"
-	log.info '    --input_file     FILE                    File in TSV format containing ID and BAM names.'
+	log.info '    --input_file     FILE                    File in TSV format containing ID, path to BAM file, and readlength per sample.'
     log.info '    --output_folder  STRING                  Output folder (default: results_alignment).'
 	log.info '    --readlength     STRING                  Mean read length for count computation (default: 75).'
     log.info '    --cpu            INTEGER                 Number of cpu used by bwa mem and sambamba (default: 2).'
@@ -72,6 +72,7 @@ if (params.help) {
    log.info "readlength     = ${params.readlength}"
    log.info "output_folder  = ${params.output_folder}"
    log.info "gtf            = ${params.gtf}"
+   log.info "twopass        = ${params.twopass}"
    log.info "help:            ${params.help}"
 }
 
