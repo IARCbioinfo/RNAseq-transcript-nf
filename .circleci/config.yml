@@ -14,6 +14,8 @@ jobs:
                         - run: cd ; nextflow run ~/project/rnaseq-transcript.nf --help
                         - run: cd ; nextflow run ~/project/rnaseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --cpu 2 --mem 2 -with-dag dag_stringtie_1pass.png
                         - run: cd ; nextflow run ~/project/rnaseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --cpu 2 --mem 2 -with-dag dag_stringtie_1pass.html
+                        - run: cd ; nextflow run ~/project/rnaseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --twopass --cpu 2 --mem 2 -with-dag dag_stringtie_2pass.png
+                        - run: cd ; nextflow run ~/project/rnaseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --twopass --cpu 2 --mem 2 -with-dag dag_stringtie_2pass.html
                         - run: cd ; cp ~/dag* ~/project/.
                         - deploy:
                                 branch: [master, dev]
