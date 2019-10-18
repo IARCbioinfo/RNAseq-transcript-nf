@@ -20,7 +20,7 @@ You can avoid installing all the external software by only installing Docker. Se
   |-----------|---------------|
   | input_folder    | input folder with BAM files |
   
-  Specify the test files location
+
 
 ## Parameters
 * #### Mandatory
@@ -32,11 +32,20 @@ You can avoid installing all the external software by only installing Docker. Se
   * #### Optional
 | Name      | Default value | Description     |
 |-----------|---------------|-----------------| 
+|--input_file | null |  File in TSV format containing ID, path to BAM file, and readlength per sample |
 | --output_folder |      . | folder where output is written |
+|--readlength | 75 | Mean read length for count computation |
 | --mem  | 2 | memory |
 | --cpu  | 2 | number of CPUs | 
 
+Note that you have two ways of providing input: specifying a folder (then all bam files will be processed) or a file with columns "ID", "bam", and "readlength" (in any order). The file method is preferred when bam files do not all have the same read length.
 
+* #### Flags
+
+| Name  | Description |
+|-----------|-------------| 
+|--help | print usage and optional parameters |
+|--twopass | Enable StringTie 2pass mode |
 	
 ## Usage 
   ```
@@ -44,13 +53,14 @@ You can avoid installing all the external software by only installing Docker. Se
   ```
   
 ## Output 
-The output include usual StringTie outputs (see detailed description at https://github.com/gpertea/stringtie):
-- an annotation file with the discovered and known transcripts (gffcmp_merged.annotated.gtf), along with information about naming (gffcmp_merged.stringtie_merged.gtf.refmap, gffcmp_merged.tracking) and positions (gffcmp_merged.loci, gffcmp_merged.stringtie_merged.gtf.tmap), and some statistics (gffcmp_merged.stats)
-
-In addition, a folder is created for each sample, with:
+- StringTie logs in folder logs/
+- matrices with gene and transcript expression in different formats (counts, FPKM, and an R ballgown object *bg.rda* with all information) in folder expr_matrices
+In addition, in a folder is created in sample/folders for each sample, with:
 - an expression quantification file (\*_gene_abund.tab) with FPKM and TPM
 - an annotation file (\*_merged.gtf)
 - Ballgown input files for statistical analysis using R package ballgown (exon/transcript and intron/transcript ids correspondance e2t.ctab and i2t.ctab, exon, intron, and transcript-level quantification files e_data.ctab, i_data.ctab, and t_data.ctab) 
+
+- if the twopass mode is enabled, an annotation file with the discovered and known transcripts (gtf/gffcmp_merged.annotated.gtf), along with information about naming (gffcmp_merged.stringtie_merged.gtf.refmap, gffcmp_merged.tracking) and positions (gffcmp_merged.loci, gffcmp_merged.stringtie_merged.gtf.tmap), and some statistics (gtf/gffcmp_merged.stats)
 
 
 ## Detailed description
