@@ -11,8 +11,8 @@ jobs:
                         - run: echo " docker.runOptions = '-u $(id -u):$(id -g)' " > ~/.nextflow/config
                         - run: cd ; nextflow run ~/RNAseq-nf -with-docker iarcbioinfo/rnaseq-nf --input_folder ~/data_test/BAM/ --output_folder BAM_realigned --ref_folder  ~/data_test/REF --gtf ~/data_test/REF/TP53_small.gtf --bed ~/data_test/BED/TP53_small.bed --cpu 2 --mem 4
                         - run: cd ~/project/ ; docker build -t iarcbioinfo/rnaseq-transcript-nf .
-                        - run: cd ; nextflow run ~/project/RNAseq-transcript.nf --help
-                        - run: cd ; nextflow run ~/project/RNAseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --cpu 2 --mem 2
+                        - run: cd ; nextflow run ~/project/rnaseq-transcript.nf --help
+                        - run: cd ; nextflow run ~/project/rnaseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --cpu 2 --mem 2
                         - run: cd ; cp ~/dag* ~/project/.
                         - deploy:
                                 branch: [master, dev]
