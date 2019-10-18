@@ -70,7 +70,7 @@ This workflow involves 3 steps:
 - a 2nd pass quantifies transcripts from the merged file (without new transcript discovery) in each sample
 
 ## Directed Acyclic Graph
-[![DAG](dag.png)](http://htmlpreview.github.io/?https://github.com/IARCbioinfo/template-nf/blob/master/dag.html)
+[![DAG](dag_stringtie_1pass.png)](http://htmlpreview.github.io/?https://github.com/IARCbioinfo/template-nf/blob/master/dag_stringtie_1pass.html)
 
 ## Contributions
 
