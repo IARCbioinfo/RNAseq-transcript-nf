@@ -55,7 +55,7 @@ Note that you have two ways of providing input: specifying a folder (then all ba
 ## Output 
 - StringTie logs in folder logs/
 - matrices with gene and transcript expression in different formats (counts, FPKM, and an R ballgown object *bg.rda* with all information) in folder expr_matrices
-In addition, in a folder is created in sample/folders for each sample, with:
+In addition, a folder is created (sample/ST1pass/ or sample/ST2pass depending on the twopass option) with a folder for each sample, with:
 - an expression quantification file (\*_gene_abund.tab) with FPKM and TPM
 - an annotation file (\*_merged.gtf)
 - Ballgown input files for statistical analysis using R package ballgown (exon/transcript and intron/transcript ids correspondance e2t.ctab and i2t.ctab, exon, intron, and transcript-level quantification files e_data.ctab, i_data.ctab, and t_data.ctab) 
