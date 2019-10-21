@@ -1,5 +1,8 @@
 # RNAseq-transcript-nf
 ## RNA-seq transcript-level analysis nextflow pipeline
+[![CircleCI](https://circleci.com/gh/IARCbioinfo/RNAseq-transcript-nf/tree/master.svg?style=svg)](https://circleci.com/gh/IARCbioinfo/RNAseq-transcript-nf/tree/master)
+[![Docker Hub](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/r/iarcbioinfo/rnaseq-transcript-nf/)
+
 
 ![Workflow representation](rnaseq-transcript-nf.png)
 
