@@ -1,4 +1,10 @@
+args = commandArgs(trailingOnly=TRUE)
+suffix=args[1]
+if(is.na(suffix)) suffix = ""
+
 require(ballgown)
+
+#load samples
 samples = list.dirs(".")
 samples = gsub("./", "", samples[samples!="."])
 bg = ballgown(samples=samples, dataDir=".", meas='all')
@@ -10,6 +16,6 @@ tdata = cbind(transcriptNames(bg),tdata)
 colnames(tdata)[1] = "transcript_id"
 
 #write tables and R object
-write.csv(gdata,"gene_FPKM_matrix.csv",quote=F,row.names = F)
-write.csv(tdata,"transcript_FPKM_matrix.csv",quote=F,row.names = F)
-save(bg,file="bg.rda")
+write.csv(gdata,paste0("gene_FPKM_matrix",suffix,".csv"),quote=F,row.names = F)
+write.csv(tdata,paste0("transcript_FPKM_matrix",suffix,".csv"),quote=F,row.names = F)
+save(bg,file=paste0("bg",suffix,".rda") )
