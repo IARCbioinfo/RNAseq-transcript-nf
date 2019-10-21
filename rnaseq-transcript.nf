@@ -108,32 +108,28 @@ process StringTie1stpass {
 	file gtf
 	
 	output:
-	set file("${file_tag}"), val(readlength) into ST_out
+	set file("${file_tag}"), val(readlength) into ST_out1pass
 	file "*.log" into stringtie_log
 	publishDir params.output_folder, mode: 'copy', saveAs: {filename ->
-            if (filename.indexOf(".log") > 0) "logs/$filename"
-            else "sample_folders/$filename"
+            if (filename.indexOf(".log") > 0) "logs/ST1pass/$filename"
+            else "sample_folders/ST1pass/$filename"
 	}
 
 	shell:
-	if(params.twopass==null){
-	  STopts="-e -B -A ${file_tag}_pass1_gene_abund.tab "
-	}else{
+	if(params.twopass){
 	  STopts=" "
+	}else{
+	  STopts="-e -B -A ${file_tag}_pass1_gene_abund.tab "
 	}
     	'''
     	stringtie !{STopts} -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag} !{bam}
 		mkdir !{file_tag}
 		mv *tab !{file_tag}/
 		mv *_ST.gtf !{file_tag}/
-		cp .command.log !{file_tag}.log
+		cp .command.log !{file_tag}_1pass.log
     	'''
 }
 
-ST_out4group = Channel.create()
-ST_out_final = Channel.create()
-ST_out_final4bg = Channel.create()
-ST_out_final4print = Channel.create()
 if(params.twopass){
 // Merges the list of transcripts of each BAM file
 process mergeGTF {
@@ -142,7 +138,7 @@ process mergeGTF {
 	tag { "merge" }
 
 	input:
-	file gtfs from ST_out.collect()
+	file gtfs from ST_out1pass.collect()
 	file gtf
 
 	output: 
@@ -173,30 +169,28 @@ process StringTie2ndpass {
 	set file("${file_tag}"), val(readlength) into ST_out2
 	file "*.log" into stringtie_log_2pass
 	publishDir params.output_folder, mode: 'copy', saveAs: {filename ->
-        if (filename.indexOf(".log") > 0) "logs/$filename"
-        else "sample_folders/$filename"
+        if (filename.indexOf(".log") > 0) "logs/ST2pass/$filename"
+        else "sample_folders/ST2pass/$filename"
 	}
 
 	shell:
-	file_tag=bam.baseName
 	'''
 	stringtie -e -B -p !{params.cpu} -G !{merged_gtf} -o !{file_tag}_ST_2pass.gtf -A !{file_tag}_gene_abund.tab !{bam}
 	mkdir !{file_tag}
 	mv *tab !{file_tag}/
 	mv *_ST_2pass.gtf !{file_tag}/
-	cp .command.log !{file_tag}.log
+	cp .command.log !{file_tag}_2pass.log
 	'''
 }
-ST_out2.into( ST_out4group, ST_out_final4bg)
-ST_out4group.groupTuple(by:1)
-		    .into( ST_out_final, ST_out_final4print)
-ST_out_final4print.subscribe{ println it}
-}else{ 
-	ST_out.into( ST_out4group, ST_out_final4bg)
-	ST_out4group.groupTuple(by:1)
-		    	.into( ST_out_final, ST_out_final4print)
-	ST_out_final4print.subscribe{ println it}
-}
+}else{
+	ST_out2 = ST_out1pass
+}//end if twopass
+ST_out4prepDE = Channel.create()
+ST_out4bg = Channel.create()
+ST_out4group = Channel.create()
+
+ST_out2.into( ST_out4group, ST_out4bg)
+ST_out4prepDE = ST_out4group.groupTuple(by:1)
 
 process prepDE {
 	cpus params.cpu
@@ -204,7 +198,7 @@ process prepDE {
 	tag { readlength }
 
 	input:
-	set file(ST_outs), val(readlength) from ST_out_final
+	set file(ST_outs), val(readlength) from ST_out4prepDE
 	file samplenames from ch_prepDE_input
 
 	output: 
@@ -213,8 +207,9 @@ process prepDE {
 
 	shell:
 	input = samplenames.name != 'NO_FILE' ? "$samplenames" : '.'
+	suffix = params.twopass == null ? "" : '_2pass'
 	'''
-	prepDE.py -i !{input} -l !{readlength} -g gene_count_matrix_l!{readlength}.csv -t transcript_count_matrix_l!{readlength}.csv
+	prepDE.py -i !{input} -l !{readlength} -g gene_count_matrix!{suffix}_l!{readlength}.csv -t transcript_count_matrix!{suffix}_l!{readlength}.csv
 	'''
 }
 
@@ -223,17 +218,16 @@ process ballgown_create {
 	memory params.mem +'G'
 
 	input:
-	file ST_outs from ST_out_final4bg.collect()
-	file samplenames from ch_prepDE_input
+	file ST_outs from ST_out4bg.collect()
 
 	output: 
-	file("*_matrix.csv") into FPKM_matrices
-	file("*.rda") into rdata
+	file("*_matrix*.csv") into FPKM_matrices
+	file("*.rda") into rdata2pass
 	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
 
 	shell:
-	input = samplenames.name != 'NO_FILE' ? "$samplenames" : '.'
+	suffix = params.twopass == null ? " " : '_2pass'
 	'''
-	Rscript !{baseDir}/bin/create_matrices.R
+	Rscript !{baseDir}/bin/create_matrices.R !{suffix}
 	'''
 }
