@@ -1,0 +1,22 @@
+version: 2
+
+jobs:
+        build:
+                machine: true
+                steps:
+                        - checkout
+                        - run: cd ~ ; wget -qO- get.nextflow.io | bash ; chmod 755 nextflow ; sudo ln -s ~/nextflow /usr/local/bin/ ; sudo apt-get install graphviz
+                        - run: cd ~ && git clone https://github.com/iarcbioinfo/data_test.git
+                        - run: cd ~ && git clone https://github.com/iarcbioinfo/RNAseq-nf.git
+                        - run: echo " docker.runOptions = '-u $(id -u):$(id -g)' " > ~/.nextflow/config
+                        - run: cd ; nextflow run ~/RNAseq-nf -with-docker iarcbioinfo/rnaseq-nf --input_folder ~/data_test/BAM/ --output_folder BAM_realigned --ref_folder  ~/data_test/REF --gtf ~/data_test/REF/TP53_small.gtf --bed ~/data_test/BED/TP53_small.bed --cpu 2 --mem 4
+                        - run: cd ~/project/ ; docker build -t iarcbioinfo/rnaseq-transcript-nf .
+                        - run: cd ; nextflow run ~/project/rnaseq-transcript.nf --help
+                        - run: cd ; nextflow run ~/project/rnaseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --cpu 2 --mem 2 -with-dag dag_stringtie_1pass.png
+                        - run: cd ; nextflow run ~/project/rnaseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --cpu 2 --mem 2 -with-dag dag_stringtie_1pass.html
+                        - run: cd ; nextflow run ~/project/rnaseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --twopass --cpu 2 --mem 2 -with-dag dag_stringtie_2pass.png
+                        - run: cd ; nextflow run ~/project/rnaseq-transcript.nf -with-docker iarcbioinfo/rnaseq-transcript-nf --input_folder ~/BAM_realigned/BAM/ --output_folder stringtie_output --gtf ~/data_test/REF/TP53_small.gtf --twopass --cpu 2 --mem 2 -with-dag dag_stringtie_2pass.html
+                        - run: cd ; cp ~/dag* ~/project/.
+                        - deploy:
+                                branch: [master, dev]
+                                command: chmod +x deploy.sh && ./deploy.sh

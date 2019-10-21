@@ -1,7 +1,5 @@
 #! /usr/bin/env nextflow
 
-//vim: syntax=groovy -*- mode: groovy;-*-
-
 // Copyright (C) 2017 IARC/WHO
 
 // This program is free software: you can redistribute it and/or modify
@@ -19,17 +17,23 @@
 
 
 params.input_folder = '.'
+params.input_file = null
 params.output_folder= "."
 params.mem  = 2
 params.cpu  = 2
 params.gtf  = null
+params.prepDE_input = 'NO_FILE'
+params.readlength = 75
+
+params.twopass  = null
 
 params.help = null
 
 log.info ""
-log.info "--------------------------------------------------------"
-log.info "  <PROGRAM_NAME> <VERSION>: <SHORT DESCRIPTION>         "
-log.info "--------------------------------------------------------"
+log.info "-----------------------------------------------------------------"
+log.info "RNAseq-transcript-nf 2.0.0: gene- and transcript-level           "
+log.info "expression quantification from RNA sequencing data with StringTie"
+log.info "-----------------------------------------------------------------"
 log.info "Copyright (C) IARC/WHO"
 log.info "This program comes with ABSOLUTELY NO WARRANTY; for details see LICENSE"
 log.info "This is free software, and you are welcome to redistribute it"
@@ -45,38 +49,53 @@ if (params.help) {
     log.info "nextflow run iarcbioinfo/rnaseq-transcript-nf [-with-docker] [OPTIONS]"
     log.info ""
     log.info "Mandatory arguments:"
-    log.info '    --input_folder   FOLDER                  Folder containing BAM or fastq files to be aligned.'
-    log.info '    --gtf          FILE                    Annotation file.'
+    log.info '    --input_folder   FOLDER                  Folder containing RNA-seq BAM files whose expression to quantify.'
+    log.info '    --gtf            FILE                    Annotation file.'
     log.info ""
     log.info "Optional arguments:"
-    log.info '    --output_folder     STRING                Output folder (default: results_alignment).'
-    log.info '    --cpu          INTEGER                 Number of cpu used by bwa mem and sambamba (default: 2).'
-    log.info '    --mem          INTEGER                 Size of memory used for mapping (in GB) (default: 2).' 
+	log.info '    --input_file     FILE                    File in TSV format containing ID, path to BAM file, and readlength per sample.'
+    log.info '    --output_folder  STRING                  Output folder (default: results_alignment).'
+	log.info '    --readlength     STRING                  Mean read length for count computation (default: 75).'
+    log.info '    --cpu            INTEGER                 Number of cpu used by bwa mem and sambamba (default: 2).'
+    log.info '    --mem            INTEGER                 Size of memory used for mapping (in GB) (default: 2).' 
     log.info ""
     log.info "Flags:"
-    log.info "--<FLAG>                                                    <DESCRIPTION>"
+    log.info "--twopass                                    Enable StringTie 2pass mode"
     log.info ""
     exit 0
 } else {
 /* Software information */
-   log.info "input_folder = ${params.input_folder}"
-   log.info "cpu          = ${params.cpu}"
-   log.info "mem          = ${params.mem}"
-   log.info "output_folder= ${params.output_folder}"
-   log.info "help:                               ${params.help}"
+   log.info "input_folder   = ${params.input_folder}"
+   log.info "input_file     = ${params.input_file}"
+   log.info "cpu            = ${params.cpu}"
+   log.info "mem            = ${params.mem}"
+   log.info "readlength     = ${params.readlength}"
+   log.info "output_folder  = ${params.output_folder}"
+   log.info "gtf            = ${params.gtf}"
+   log.info "twopass        = ${params.twopass}"
+   log.info "help:            ${params.help}"
 }
 
+if(params.input_file){
+	bam_files = Channel.fromPath("${params.input_file}")
+     	   .splitCsv( header: true, sep: '\t', strip: true )
+	       .map { row -> [ row.ID , row.readlength , file(row.bam) ] }
+}else{
 if (file(params.input_folder).listFiles().findAll { it.name ==~ /.*bam/ }.size() > 0){
        println "BAM files found, proceed with transcript quantification"; mode ='bam'
-       bam_files = Channel.fromPath( params.input_folder+'/*.bam'
-       //bai_files = Channel.fromPath( params.input_folder+'/*.bai'
-       )
+       bam_files = Channel.fromPath( params.input_folder+'/*.bam')
+                          .map{ path -> [ path.name.replace(".bam",""), params.readlength, path ] }
+			  .view()
 }else{
        println "ERROR: input folder contains no fastq nor BAM files"; System.exit(1)
+}
 }
 
 gtf = file(params.gtf)
 bam_files.into { bam_files_41stpass; bam_files_42ndpass }
+
+//input file for the prepDE python script
+ch_prepDE_input = file(params.prepDE_input)
 
 // 1st pass identifies new transcripts for each BAM file
 process StringTie1stpass {
@@ -85,19 +104,33 @@ process StringTie1stpass {
 	tag { file_tag }
 
 	input:
-	file bam from bam_files_41stpass
+	set file_tag, val(readlength), file(bam) from bam_files_41stpass
 	file gtf
 	
 	output:
-	file("${file_tag}_ST.gtf") into STgtfs
-    
+	set file("${file_tag}"), val(readlength) into ST_out1pass
+	file "*.log" into stringtie_log
+	publishDir params.output_folder, mode: 'copy', saveAs: {filename ->
+            if (filename.indexOf(".log") > 0) "logs/ST1pass/$filename"
+            else "sample_folders/ST1pass/$filename"
+	}
+
 	shell:
-	file_tag=bam.baseName
+	if(params.twopass){
+	  STopts=" "
+	}else{
+	  STopts="-e -B -A ${file_tag}_pass1_gene_abund.tab "
+	}
     	'''
-    	stringtie  !{file_tag}.bam -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag}
+    	stringtie !{STopts} -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag} !{bam}
+		mkdir !{file_tag}
+		mv *tab !{file_tag}/
+		mv *_ST.gtf !{file_tag}/
+		cp .command.log !{file_tag}_1pass.log
     	'''
 }
 
+if(params.twopass){
 // Merges the list of transcripts of each BAM file
 process mergeGTF {
 	cpus params.cpu
@@ -105,17 +138,17 @@ process mergeGTF {
 	tag { "merge" }
 
 	input:
-	file gtfs from STgtfs.collect()
+	file gtfs from ST_out1pass.collect()
 	file gtf
 
 	output: 
 	file("stringtie_merged.gtf") into merged_gtf
 	file("gffcmp_merged*") into gffcmp_output
-	publishDir "${params.output_folder}", mode: 'copy', pattern: '{gffcmp_merged*}' 
+	publishDir "${params.output_folder}/gtf", mode: 'copy', pattern: '{gffcmp_merged*}' 
 
 	shell:
 	'''
-	ls *_ST.gtf > mergelist.txt
+	ls */*_ST.gtf > mergelist.txt
 	stringtie --merge -p !{params.cpu} -G !{gtf} -o stringtie_merged.gtf mergelist.txt
 	gffcompare -r !{gtf} -G -o gffcmp_merged stringtie_merged.gtf
 	'''
@@ -128,20 +161,73 @@ process StringTie2ndpass {
 	tag { file_tag }
 
 	input:
-	file bam from bam_files_42ndpass
+	set file_tag, val(readlength), file(bam) from bam_files_42ndpass
 	file merged_gtf
 	file gtf
 
 	output: 
-	file("${file_tag}_gene_abund.tab") into tabs
-	file("*.ctab") into ctabs
-	file("${file_tag}_merged.gtf") into gtf_merged
-	publishDir "${params.output_folder}/${file_tag}", mode: 'copy'
+	set file("${file_tag}"), val(readlength) into ST_out2
+	file "*.log" into stringtie_log_2pass
+	publishDir params.output_folder, mode: 'copy', saveAs: {filename ->
+        if (filename.indexOf(".log") > 0) "logs/ST2pass/$filename"
+        else "sample_folders/ST2pass/$filename"
+	}
 
 	shell:
-	file_tag=bam.baseName
 	'''
-	stringtie -e -B -p !{params.cpu} -G !{merged_gtf} -o !{file_tag}_merged.gtf -A !{file_tag}_gene_abund.tab !{file_tag}.bam
+	stringtie -e -B -p !{params.cpu} -G !{merged_gtf} -o !{file_tag}_ST_2pass.gtf -A !{file_tag}_gene_abund.tab !{bam}
+	mkdir !{file_tag}
+	mv *tab !{file_tag}/
+	mv *_ST_2pass.gtf !{file_tag}/
+	cp .command.log !{file_tag}_2pass.log
+	'''
+}
+}else{
+	ST_out2 = ST_out1pass
+}//end if twopass
+ST_out4prepDE = Channel.create()
+ST_out4bg = Channel.create()
+ST_out4group = Channel.create()
+
+ST_out2.into( ST_out4group, ST_out4bg)
+ST_out4prepDE = ST_out4group.groupTuple(by:1)
+
+process prepDE {
+	cpus params.cpu
+	memory params.mem +'G'
+	tag { readlength }
+
+	input:
+	set file(ST_outs), val(readlength) from ST_out4prepDE
+	file samplenames from ch_prepDE_input
+
+	output: 
+	file("*count_matrix*.csv") into count_matrices
+	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
+
+	shell:
+	input = samplenames.name != 'NO_FILE' ? "$samplenames" : '.'
+	suffix = params.twopass == null ? "" : '_2pass'
+	'''
+	prepDE.py -i !{input} -l !{readlength} -g gene_count_matrix!{suffix}_l!{readlength}.csv -t transcript_count_matrix!{suffix}_l!{readlength}.csv
 	'''
 }
 
+process ballgown_create {
+	cpus params.cpu
+	memory params.mem +'G'
+
+	input:
+	file ST_outs from ST_out4bg.collect()
+
+	output: 
+	file("*_matrix*.csv") into FPKM_matrices
+	file("*.rda") into rdata2pass
+	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
+
+	shell:
+	suffix = params.twopass == null ? " " : '_2pass'
+	'''
+	Rscript !{baseDir}/bin/create_matrices.R !{suffix}
+	'''
+}

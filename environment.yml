@@ -1,0 +1,10 @@
+name: rnaseq-transcript
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - stringtie=1.3.6 #use 2.0 once it is done
+  - openssl=1.0
+  - bioconductor-ballgown=2.12.0
+  - gffcompare=0.11.2
