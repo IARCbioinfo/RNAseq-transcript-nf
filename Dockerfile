@@ -25,6 +25,7 @@ RUN wget https://github.com/gpertea/stringtie/releases/download/v2.0.5/stringtie
     tar -xzf stringtie-2.0.5.Linux_x86_64.tar.gz && \
     rm -rf /opt/conda/envs/rnaseq-transcript-nf/bin/stringtie && \
     rm -rf /opt/conda/envs/rnaseq-transcript-nf/bin/prepDE.py && \
-    ln -s stringtie-2.0.5.Linux_x86_64/stringtie /usr/bin/. && \
-    ln -s stringtie-2.0.5.Linux_x86_64/prepDE.py /usr/bin/. && \
-    rm -rf stringtie-2.0.5.Linux_x86_64.tar.gz
+    mv stringtie-2.0.5.Linux_x86_64/stringtie /usr/bin/. && \
+    mv stringtie-2.0.5.Linux_x86_64/prepDE.py /usr/bin/. && \
+    rm -rf stringtie-2.0.5.Linux_x86_64.tar.gz && \
+    rm -rf stringtie-2.0.5.Linux_x86_64
