@@ -21,11 +21,11 @@ MAINTAINER **nalcala** <**alcalan@fellows.iarc.fr**>
 COPY environment.yml /
 RUN conda env create -n rnaseq-transcript-nf -f /environment.yml && conda clean -a
 ENV PATH /opt/conda/envs/rnaseq-transcript-nf/bin:$PATH
-RUN wget https://github.com/gpertea/stringtie/releases/download/v2.0.5/stringtie-2.0.5.Linux_x86_64.tar.gz && \
-    tar -xzf stringtie-2.0.5.Linux_x86_64.tar.gz && \
+RUN wget https://github.com/gpertea/stringtie/releases/download/v2.0.6/stringtie-2.0.6.Linux_x86_64.tar.gz && \
+    tar -xzf stringtie-2.0.6.Linux_x86_64.tar.gz && \
     rm -rf /opt/conda/envs/rnaseq-transcript-nf/bin/stringtie && \
     rm -rf /opt/conda/envs/rnaseq-transcript-nf/bin/prepDE.py && \
-    mv stringtie-2.0.5.Linux_x86_64/stringtie /usr/bin/. && \
-    mv stringtie-2.0.5.Linux_x86_64/prepDE.py /usr/bin/. && \
-    rm -rf stringtie-2.0.5.Linux_x86_64.tar.gz && \
-    rm -rf stringtie-2.0.5.Linux_x86_64
+    mv stringtie-2.0.6.Linux_x86_64/stringtie /usr/bin/. && \
+    mv stringtie-2.0.6.Linux_x86_64/prepDE.py /usr/bin/. && \
+    rm -rf stringtie-2.0.6.Linux_x86_64.tar.gz && \
+    rm -rf stringtie-2.0.6.Linux_x86_64
