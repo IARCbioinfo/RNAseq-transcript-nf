@@ -124,7 +124,7 @@ process StringTie1stpass {
     	'''
     	stringtie !{STopts} -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag} !{bam}
 		mkdir !{file_tag}
-		mv *tab !{file_tag}/
+		if [ -f *tab ]; then mv *tab !{file_tag}/; fi 
 		mv *_ST.gtf !{file_tag}/
 		cp .command.log !{file_tag}_1pass.log
     	'''
