@@ -6,5 +6,6 @@ Bootstrap:docker
     DESCRIPTION Container image containing all requirements for pipeline RNAseq-transcript-nf
     VERSION 1.0
 
+
 # environment.yml commit ID: f67dc9b
 
