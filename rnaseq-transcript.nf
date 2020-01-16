@@ -117,16 +117,19 @@ process StringTie1stpass {
 
 	shell:
 	if(params.twopass){
-	  STopts=" "
+	  STopts="-o ${file_tag}_1of2passes_ST.gtf"
+	  logfile="${file_tag}_1of2passes.log"
 	}else{
-	  STopts="-e -B -A ${file_tag}_pass1_gene_abund.tab "
+	  STopts="-o ${file_tag}_1pass_ST.gtf -e -B -A ${file_tag}_pass1_gene_abund.tab "
+	  logfile="${file_tag}_1pass.log"
 	}
     	'''
-    	stringtie !{STopts} -o !{file_tag}_ST.gtf -p !{params.cpu} -G !{gtf} -l !{file_tag} !{bam}
+    	stringtie !{STopts} -p !{params.cpu} -G !{gtf} -l !{file_tag} !{bam}
 		mkdir !{file_tag}
-		if [ -f *tab ]; then mv *tab !{file_tag}/; fi 
+		tabs=(*tab)
+		if [ -f ${tabs[0]} ]; then mv *tab !{file_tag}/; fi 
 		mv *_ST.gtf !{file_tag}/
-		cp .command.log !{file_tag}_1pass.log
+		cp .command.log !{logfile}
     	'''
 }
 
@@ -175,10 +178,10 @@ process StringTie2ndpass {
 
 	shell:
 	'''
-	stringtie -e -B -p !{params.cpu} -G !{merged_gtf} -o !{file_tag}_ST_2pass.gtf -A !{file_tag}_gene_abund.tab !{bam}
+	stringtie -o !{file_tag}_2pass_ST.gtf -e -B -A !{file_tag}_pass2_gene_abund.tab -p !{params.cpu} -G !{merged_gtf} !{bam}
 	mkdir !{file_tag}
 	mv *tab !{file_tag}/
-	mv *_ST_2pass.gtf !{file_tag}/
+	mv *_2pass_ST.gtf !{file_tag}/
 	cp .command.log !{file_tag}_2pass.log
 	'''
 }
