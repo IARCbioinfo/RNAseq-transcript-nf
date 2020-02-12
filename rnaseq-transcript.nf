@@ -111,8 +111,12 @@ process StringTie1stpass {
 	set file("${file_tag}"), val(readlength) into ST_out1pass
 	file "*.log" into stringtie_log
 	publishDir params.output_folder, mode: 'copy', saveAs: {filename ->
-            if (filename.indexOf(".log") > 0) "logs/ST1pass/$filename"
-            else "sample_folders/ST1pass/$filename"
+            if (filename.indexOf(".log") > 0){ 
+				"logs/$filename"
+			}else{
+				if(params.twopass) "sample_folders/ST1of2passes/$filename"
+				else "sample_folders/ST1pass/$filename"
+			}
 	}
 
 	shell:
@@ -172,7 +176,7 @@ process StringTie2ndpass {
 	set file("${file_tag}"), val(readlength) into ST_out2
 	file "*.log" into stringtie_log_2pass
 	publishDir params.output_folder, mode: 'copy', saveAs: {filename ->
-        if (filename.indexOf(".log") > 0) "logs/ST2pass/$filename"
+        if (filename.indexOf(".log") > 0) "logs/$filename"
         else "sample_folders/ST2pass/$filename"
 	}
 
