@@ -31,7 +31,7 @@ params.help = null
 
 log.info ""
 log.info "-----------------------------------------------------------------"
-log.info "RNAseq-transcript-nf 2.0.0: gene- and transcript-level           "
+log.info "RNAseq-transcript-nf 2.1: gene- and transcript-level           "
 log.info "expression quantification from RNA sequencing data with StringTie"
 log.info "-----------------------------------------------------------------"
 log.info "Copyright (C) IARC/WHO"
@@ -46,7 +46,7 @@ if (params.help) {
     log.info "  USAGE                                                 "
     log.info "--------------------------------------------------------"
     log.info ""
-    log.info "nextflow run iarcbioinfo/rnaseq-transcript-nf [-with-docker] [OPTIONS]"
+    log.info "nextflow run iarcbioinfo/rnaseq-transcript-nf [-profile <docker/singularity/conda>] [OPTIONS]"
     log.info ""
     log.info "Mandatory arguments:"
     log.info '    --input_folder   FOLDER                  Folder containing RNA-seq BAM files whose expression to quantify.'

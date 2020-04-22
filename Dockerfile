@@ -1,13 +1,12 @@
 ################## BASE IMAGE #####################
-FROM nfcore/base
-
+FROM continuumio/miniconda3:4.7.12
 
 ################## METADATA #######################
 
-LABEL base_image="nfcore/base"
-LABEL version="1.0"
+LABEL base_image="continuumio/miniconda3"
+LABEL version="4.7.12"
 LABEL software="rnaseq-transcript-nf"
-LABEL software.version="2.0"
+LABEL software.version="2.1"
 LABEL about.summary="Container image containing all requirements for rnaseq-transcript-nf"
 LABEL about.home="http://github.com/IARCbioinfo/RNAseq-transcript-nf"
 LABEL about.documentation="http://github.com/IARCbioinfo/RNAseq-transcript-nf/README.md"
@@ -19,13 +18,6 @@ MAINTAINER **nalcala** <**alcalan@fellows.iarc.fr**>
 
 ################## INSTALLATION ######################
 COPY environment.yml /
+RUN apt-get update && apt-get install -y procps && apt-get clean -y
 RUN conda env create -n rnaseq-transcript-nf -f /environment.yml && conda clean -a
 ENV PATH /opt/conda/envs/rnaseq-transcript-nf/bin:$PATH
-RUN wget https://github.com/gpertea/stringtie/releases/download/v2.0.6/stringtie-2.0.6.Linux_x86_64.tar.gz && \
-    tar -xzf stringtie-2.0.6.Linux_x86_64.tar.gz && \
-    rm -rf /opt/conda/envs/rnaseq-transcript-nf/bin/stringtie && \
-    rm -rf /opt/conda/envs/rnaseq-transcript-nf/bin/prepDE.py && \
-    mv stringtie-2.0.6.Linux_x86_64/stringtie /usr/bin/. && \
-    mv stringtie-2.0.6.Linux_x86_64/prepDE.py /usr/bin/. && \
-    rm -rf stringtie-2.0.6.Linux_x86_64.tar.gz && \
-    rm -rf stringtie-2.0.6.Linux_x86_64

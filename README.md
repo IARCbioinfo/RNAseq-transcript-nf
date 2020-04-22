@@ -15,8 +15,10 @@ Performs transcript identification and quantification from a series of BAM files
 2. External software:
 - StringTie
 
-You can avoid installing all the external software by only installing Docker. See the [IARC-nf](https://github.com/IARCbioinfo/IARC-nf) repository for more information.
-
+You can avoid installing all the external software by only installing Docker, Singularity or conda. Simply run by specifying the corresponding `-profile` option to nextflow:
+```
+nextflow run iarcbioinfo/rnaseq-transcript-nf -profile <docker/singularity/conda>
+```
 
 ## Input 
   | Type      | Description     |
