@@ -31,7 +31,7 @@ params.help = null
 
 log.info ""
 log.info "-----------------------------------------------------------------"
-log.info "RNAseq-transcript-nf 2.1: gene- and transcript-level           "
+log.info "RNAseq-transcript-nf 2.2: gene- and transcript-level           "
 log.info "expression quantification from RNA sequencing data with StringTie"
 log.info "-----------------------------------------------------------------"
 log.info "Copyright (C) IARC/WHO"
@@ -194,9 +194,10 @@ process StringTie2ndpass {
 }//end if twopass
 ST_out4prepDE = Channel.create()
 ST_out4bg = Channel.create()
+ST_out4SE = Channel.create()
 ST_out4group = Channel.create()
 
-ST_out2.into( ST_out4group, ST_out4bg)
+ST_out2.into( ST_out4group, ST_out4bg, ST_out4SE)
 ST_out4prepDE = ST_out4group.groupTuple(by:1)
 
 process prepDE {
@@ -228,7 +229,7 @@ process ballgown_create {
 	file ST_outs from ST_out4bg.collect()
 
 	output: 
-	file("*_matrix*.csv") into FPKM_matrices
+	file("*_matrix*.csv") into quantif_matrices
 	file("*.rda") into rdata2pass
 	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
 
@@ -236,5 +237,38 @@ process ballgown_create {
 	suffix = params.twopass == null ? " " : '_2pass'
 	'''
 	Rscript !{baseDir}/bin/create_matrices.R !{suffix}
+	'''
+}
+
+process SummarizedExperiment_create {
+	cpus params.cpu
+	memory params.mem +'G'
+
+	input:
+	file ST_outs from ST_out4SE.collect()
+	file quantif_matrices
+	file gtf
+
+	output: 
+	file("*_matrix*.csv") into quantif_matricesSE
+	file("*.rda") into rdata2passSE
+	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
+
+	shell:
+	suffix = params.twopass == null ? " " : '_2pass'
+	'''
+	provider=`cat !{gtf} | grep provider | awk '{print $2}'`
+	version=`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'`
+	if grep -q -E "GRCh38|hg38" !{gtf}
+		then genome=GRCh38
+	else if grep -q "GRCh37|hg19" !{gtf}
+			then genome=hg19
+		else genome=other
+		fi
+	fi
+	if grep -q -E "homo sapiens|human" !{gtf}
+		then organism="Homo sapiens"
+	fi
+	Rscript !{baseDir}/bin/create_summarizedExperiment.R !{gtf} $provider $version $genome $organism !{params.gtf}
 	'''
 }

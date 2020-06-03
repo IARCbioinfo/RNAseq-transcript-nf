@@ -4,7 +4,8 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - stringtie=2.1.1
+  - stringtie=2.1.2
   - openssl=1.1.1
-  - bioconductor-ballgown=2.18.0
+  - bioconductor-ballgown=2.20.0
   - gffcompare=0.11.2
+  - bioconductor-tximeta=1.6.2
