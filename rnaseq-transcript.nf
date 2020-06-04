@@ -24,8 +24,12 @@ params.cpu  = 2
 params.gtf  = null
 params.prepDE_input = 'NO_FILE'
 params.readlength = 75
-
 params.twopass  = null
+params.annot_organism = "Homo sapiens"
+params.annot_genome   = "hg38" 
+params.annot_provider = "Unknown" 
+params.annot_version = "Unknown" 
+params.ref = "Unknown"
 
 params.help = null
 
@@ -56,6 +60,13 @@ if (params.help) {
 	log.info '    --input_file     FILE                    File in TSV format containing ID, path to BAM file, and readlength per sample.'
     log.info '    --output_folder  STRING                  Output folder (default: results_alignment).'
 	log.info '    --readlength     STRING                  Mean read length for count computation (default: 75).'
+	log.info '    --prepDE_input   FILE					   File given to script prepDE from StringTie (default: none).'
+	log.info '    --annot_organism, '
+	log.info '    --annot_genome, '
+	log.info '    --annot_provider,'
+	log.info '    --annot_version,'
+	log.info '    --ref 		   STRINGS				   metainformation stored in SummarizedExperiment R object'
+	log.info '					    					   (default: "Homo sapiens","hg38", Unknown, Unknown, Unknown)'
     log.info '    --cpu            INTEGER                 Number of cpu used by bwa mem and sambamba (default: 2).'
     log.info '    --mem            INTEGER                 Size of memory used for mapping (in GB) (default: 2).' 
     log.info ""
@@ -65,14 +76,20 @@ if (params.help) {
     exit 0
 } else {
 /* Software information */
-   log.info "input_folder   = ${params.input_folder}"
-   log.info "input_file     = ${params.input_file}"
-   log.info "cpu            = ${params.cpu}"
-   log.info "mem            = ${params.mem}"
-   log.info "readlength     = ${params.readlength}"
-   log.info "output_folder  = ${params.output_folder}"
-   log.info "gtf            = ${params.gtf}"
-   log.info "twopass        = ${params.twopass}"
+   log.info "input_folder	= ${params.input_folder}"
+   log.info "input_file		= ${params.input_file}"
+   log.info "cpu			= ${params.cpu}"
+   log.info "mem			= ${params.mem}"
+   log.info "readlength		= ${params.readlength}"
+   log.info "output_folder	= ${params.output_folder}"
+   log.info "gtf			= ${params.gtf}"
+   log.info "twopass		= ${params.twopass}"
+   log.info "params.prepDE_input = ${params.prepDE_input}"
+   log.info "annot_organism	= ${params.annot_organism}"
+   log.info "annot_genome	= ${params.annot_genome}"
+   log.info "annot_provider	= ${params.annot_provider}"
+   log.info "annot_version	= ${params.annot_version}"
+   log.info "ref			= ${params.ref}"
    log.info "help:            ${params.help}"
 }
 
@@ -114,8 +131,8 @@ process StringTie1stpass {
             if (filename.indexOf(".log") > 0){ 
 				"logs/$filename"
 			}else{
-				if(params.twopass) "sample_folders/ST1of2passes/$filename"
-				else "sample_folders/ST1pass/$filename"
+				if(params.twopass) "intermediate_files/sample_folders/ST1of2passes/$filename"
+				else "intermediate_files/sample_folders/ST1pass/$filename"
 			}
 	}
 
@@ -177,7 +194,7 @@ process StringTie2ndpass {
 	file "*.log" into stringtie_log_2pass
 	publishDir params.output_folder, mode: 'copy', saveAs: {filename ->
         if (filename.indexOf(".log") > 0) "logs/$filename"
-        else "sample_folders/ST2pass/$filename"
+        else "intermediate_files/sample_folders/ST2pass/$filename"
 	}
 
 	shell:
@@ -210,8 +227,8 @@ process prepDE {
 	file samplenames from ch_prepDE_input
 
 	output: 
-	file("*count_matrix*.csv") into count_matrices
-	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
+	file("*count_matrix*.csv") into quantif_count_matrices
+	publishDir "${params.output_folder}/intermediate_files/expr_matrices", mode: 'copy'
 
 	shell:
 	input = samplenames.name != 'NO_FILE' ? "$samplenames" : '.'
@@ -229,9 +246,9 @@ process ballgown_create {
 	file ST_outs from ST_out4bg.collect()
 
 	output: 
-	file("*_matrix*.csv") into quantif_matrices
+	file("*_matrix*.csv") into quantif_norm_matrices
 	file("*.rda") into rdata2pass
-	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
+	publishDir "${params.output_folder}/intermediate_files/expr_matrices", mode: 'copy'
 
 	shell:
 	suffix = params.twopass == null ? " " : '_2pass'
@@ -246,29 +263,39 @@ process SummarizedExperiment_create {
 
 	input:
 	file ST_outs from ST_out4SE.collect()
-	file quantif_matrices
+	file quantif_norm_matrices
+	file quantif_count_matrices
 	file gtf
 
 	output: 
-	file("*_matrix*.csv") into quantif_matricesSE
 	file("*.rda") into rdata2passSE
-	publishDir "${params.output_folder}/expr_matrices", mode: 'copy'
+	publishDir "${params.output_folder}", mode: 'copy'
 
 	shell:
-	suffix = params.twopass == null ? " " : '_2pass'
+	suffix = params.twopass == null ? "_1pass" : '_2pass'
 	'''
-	provider=`cat !{gtf} | grep provider | awk '{print $2}'`
-	version=`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'`
 	if grep -q -E "GRCh38|hg38" !{gtf}
-		then genome=GRCh38
+		then genome=hg38
 	else if grep -q "GRCh37|hg19" !{gtf}
 			then genome=hg19
-		else genome=other
+		else genome="!{params.annot_genome}"
 		fi
 	fi
 	if grep -q -E "homo sapiens|human" !{gtf}
-		then organism="Homo sapiens"
+		then organism='Homo sapiens'
+	else
+		organism="!{params.annot_organism}"
 	fi
-	Rscript !{baseDir}/bin/create_summarizedExperiment.R !{gtf} $provider $version $genome $organism !{params.gtf}
+	if [`cat !{gtf} | grep provider | awk '{print $2}'` -eq ""]
+		then provider=!{params.annot_provider}
+	else
+		provider=`cat !{gtf} | grep provider | awk '{print $2}'`
+	fi
+	if [`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'` -eq ""]
+		then version=!{params.annot_version}
+	else
+		version=`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'`
+	fi
+	Rscript !{baseDir}/bin/create_summarizedExperiment.R !{gtf} ${provider} ${version} !{params.annot_genome} "!{params.annot_organism}" !{params.gtf} !{suffix} !{params.ref}
 	'''
 }
