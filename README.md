@@ -93,7 +93,7 @@ The gtf/gffcmp folder contains an annotation file with the discovered and known 
 See the [SummarizedExperiment documentation](https://bioconductor.org/packages/release/bioc/vignettes/SummarizedExperiment/inst/doc/SummarizedExperiment.html) for details about the structure. In our case, the data contains:
 - 4 assays accessible using function *assay()* (raw_counts, length--with transcript lengths--, abundance_FPKM, and abundance_TPM)
 - metadata about package versions, gtf (reference genome, version, annotation ) accessible using function *metadata()* 
-- feature data (transcript and gene name, id) accessible using function *rowData()*
+- feature data (transcript and gene name, id) accessible using function *rowData()* and *rowRanges()* (detailed information)
 - sample data (name and read length) accessible using function *colData()*
 
 ## Directed Acyclic Graph
