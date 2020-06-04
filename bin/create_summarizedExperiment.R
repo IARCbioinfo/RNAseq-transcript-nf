@@ -20,6 +20,7 @@ library(tximport)
 library(readr)
 library(dplyr)
 library(SummarizedExperiment)
+library(GenomicFeatures)
 
 # list files and transcript/gene link
 STfiles = list.files(".",pattern = "t_data.ctab",recursive = T,full.names = T)
@@ -63,15 +64,24 @@ metadata(txim)$txomeInfo = txomeInfo
 ## add raw read counts from files
 rcmat_files_list = list.files(".",pattern = "transcript_count_matrix",full.names = T)
 rcmat_list = lapply(rcmat_files_list, read_csv,col_names = T)
+readlengths_rcmat_list = sapply( rcmat_files_list, function(x) as.numeric(strsplit(strsplit(rev( strsplit(x,"_")[[1]] )[1],"l")[[1]][2],".csv")[[1]][1] ) )
+samples_rcmat_list = lapply(rcmat_list, function(x) colnames(x)[-1])
+readlengths_txim = as.data.frame(matrix(rep(NA,ncol(txim)),nrow=1 ))
+colnames(readlengths_txim) = colnames(txim)
+for(i in 1:length(rcmat_list)) readlengths_txim[1,samples_rcmat_list[[i]]] = readlengths_rcmat_list[i]
 
 for(x in rcmat_list) x = x[match(rownames(txim),x$transcript_id),]
 rcmat = rcmat_list[[1]]
 if(length(rcmat_list)>1){ 
-    for(x in rcmat_list[-1]) rcmat = bind_cols(rcmat,y)[,colnames(txim)]
+    for(x in rcmat_list[-1]) rcmat = bind_cols(rcmat,x)
 }
+rcmat = rcmat[,c("transcript_id",colnames(txim))]
+
+write_csv(rcmat,path=paste0("transcript_count_matrix",suffix,".csv"))
 rcmatdf = as.data.frame(rcmat[,-1])
 rownames(rcmatdf) = rcmat$transcript_id
 
+colData(txim)$readlength = readlengths_txim[1,]
 assays(txim,withDimnames=F)$raw_counts = rcmatdf
 
 names(assays(txim))[names(assays(txim))=="counts"] = "counts_length_normalized"
@@ -80,17 +90,33 @@ names(assays(txim))[names(assays(txim))=="abundance"] = "abundance_FPKM"
 assays(txim)$abundance_TPM = sweep(assays(txim)$abundance_FPKM, 2,colSums(assays(txim)$abundance_FPKM),"/" )*10**6
 assays(txim) <- SimpleList(counts=assay(txim,"raw_counts"),length=assay(txim,"length"),abundance_FPKM=assay(txim,"abundance_FPKM"),abundance_TPM=assay(txim,"abundance_TPM") )
 
+mytxdb = makeTxDbFromGFF(annot, dataSource=provider,organism=organism,taxonomyId=NA,
+                circ_seqs=circ_seqs,
+                chrominfo=seqinfo(gr),
+                miRBaseBuild=NA,
+                metadata=NULL)
+
+# add exon information
+exons <- exonsBy(mytxdb, by="tx",use.names=T) #tximeta:::getRanges(txdb = mytxdb, txomeInfo = txomeInfo, type = "exon")
+if (all(is.na(seqlengths(exons)))) {
+    seqinfo(exons) <- seqinfo(txim)
+}
+exons <- exons[rownames(txim)]
+stopifnot(all(rownames(txim) == names(exons)))
+mcols(exons) <- mcols(txim)
+rowRanges(txim) <- exons
+
 eval(call("<-", as.name(paste0("transcript",suffix,".SE")),txim ))
 save(list=paste0("transcript",suffix,".SE"),file = paste0("transcript",suffix,".SE.rda") )
 rm(txim)
 gc()
 
 ## 
-# create Txome annotation for our annot
-names(gr) <- gr$gene_id
+gr.g = genes(mytxdb)
+names(gr.g) <- gr.g$gene_id
 assay.nms <- rownames(assay(txim.genes,"counts"))
-genes.missing <- !assay.nms %in% names(gr)
-genes2 <- gr[rownames(assay(txim.genes,"counts"))]
+genes.missing <- !assay.nms %in% names(gr.g)
+genes2 <- gr.g[rownames(assay(txim.genes,"counts"))]
 try(seqinfo(genes2) <- Seqinfo(genome = ucsc.genome)[seqlevels(genes2)])
 
 metadata.genes = metadata
@@ -108,15 +134,29 @@ rcmat_list.g = lapply(rcmat_files_list.g, read_csv,col_names = T)
 for(x in rcmat_list.g) x = x[match(rownames(txim.genes),x$gene_id),]
 rcmat.g = rcmat_list.g[[1]]
 if(length(rcmat_list.g)>1){ 
-    for(x in rcmat_list.g[-1]) rcmat.g = bind_cols(rcmat.g,y)[,colnames(txim.genes)]
+    for(x in rcmat_list.g[-1]) rcmat.g = bind_cols(rcmat.g,y)
 }
+rcmat.g = rcmat.g[,c("gene_id",colnames(txim.genes))]
+write_csv(rcmat.g,path=paste0("gene_count_matrix",suffix,".csv"))
 rcmatdf.g = as.data.frame(rcmat.g[,-1])
 rownames(rcmatdf.g) = rcmat.g$gene_id
+
+colData(txim.genes)$readlength = readlengths_txim[1,]
 
 assays(txim.genes,withDimnames=F)$raw_counts = rcmatdf.g
 names(assays(txim.genes))[names(assays(txim.genes))=="abundance"] = "abundance_FPKM"
 assays(txim.genes)$abundance_TPM = sweep(assays(txim.genes)$abundance_FPKM, 2,colSums(assays(txim.genes)$abundance_FPKM),"/" )*10**6
 assays(txim.genes) <- SimpleList(counts=assay(txim.genes,"raw_counts"),length=assay(txim.genes,"length"),abundance_FPKM=assay(txim.genes,"abundance_FPKM"),abundance_TPM=assay(txim.genes,"abundance_TPM") )
+
+#add exon information
+exons.g <- exonsBy(mytxdb, by="gene") #tximeta:::getRanges(txdb = mytxdb, txomeInfo = txomeInfo, type = "exon")
+if (all(is.na(seqlengths(exons.g)))) {
+    seqinfo(exons) <- seqinfo(txim.genes)
+}
+exons.g <- exons.g[rownames(txim.genes)]
+stopifnot(all(rownames(txim.genes) == names(exons.g)))
+mcols(exons.g) <- mcols(txim.genes)
+rowRanges(txim.genes) <- exons.g
 
 eval(call("<-", as.name(paste0("gene",suffix,".SE")),txim.genes ))
 save(list=paste0("gene",suffix,".SE"),file = paste0("gene",suffix,".SE.rda") )

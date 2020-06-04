@@ -26,10 +26,10 @@ params.prepDE_input = 'NO_FILE'
 params.readlength = 75
 params.twopass  = null
 params.annot_organism = "Homo sapiens"
-params.annot_genome   = "hg38" 
-params.annot_provider = "Unknown" 
-params.annot_version = "Unknown" 
-params.ref = "Unknown"
+params.annot_genome   = "Unknown" 
+params.annot_provider = "Unspecified" 
+params.annot_version = "Unspecified" 
+params.ref = "Unspecified"
 
 params.help = null
 
@@ -57,8 +57,9 @@ if (params.help) {
     log.info '    --gtf            FILE                    Annotation file.'
     log.info ""
     log.info "Optional arguments:"
-	log.info '    --input_file     FILE                    File in TSV format containing ID, path to BAM file, and readlength per sample.'
-    log.info '    --output_folder  STRING                  Output folder (default: results_alignment).'
+	log.info '    --input_file     FILE                    File in TSV format containing columns "ID" (sample ID), "bam" '
+	log.info '											   (path to RNA-seq BAM file), and "readlength" (sample read length)'
+    log.info '    --output_folder  STRING                  Output folder (default: .).'
 	log.info '    --readlength     STRING                  Mean read length for count computation (default: 75).'
 	log.info '    --prepDE_input   FILE					   File given to script prepDE from StringTie (default: none).'
 	log.info '    --annot_organism, '
@@ -102,7 +103,7 @@ if (file(params.input_folder).listFiles().findAll { it.name ==~ /.*bam/ }.size()
        println "BAM files found, proceed with transcript quantification"; mode ='bam'
        bam_files = Channel.fromPath( params.input_folder+'/*.bam')
                           .map{ path -> [ path.name.replace(".bam",""), params.readlength, path ] }
-			  .view()
+			  //.view()
 }else{
        println "ERROR: input folder contains no fastq nor BAM files"; System.exit(1)
 }
@@ -166,10 +167,16 @@ process mergeGTF {
 	file gtf
 
 	output: 
-	file("stringtie_merged.gtf") into merged_gtf
+	file "stringtie_merged.gtf" into merged_gtf, merged_gtf4SE
 	file("gffcmp_merged*") into gffcmp_output
-	publishDir "${params.output_folder}/gtf", mode: 'copy', pattern: '{gffcmp_merged*}' 
-
+	publishDir "${params.output_folder}/gtf", mode: 'copy', saveAs: {filename ->
+            if (filename.indexOf("gffcmp") == 0){ 
+				"gffcmp/$filename"
+			}else{
+				"$filename"
+			}
+	}
+	
 	shell:
 	'''
 	ls */*_ST.gtf > mergelist.txt
@@ -208,6 +215,7 @@ process StringTie2ndpass {
 }
 }else{
 	ST_out2 = ST_out1pass
+	merged_gtf4SE = file('NO_FILE')
 }//end if twopass
 ST_out4prepDE = Channel.create()
 ST_out4bg = Channel.create()
@@ -248,8 +256,11 @@ process ballgown_create {
 	output: 
 	file("*_matrix*.csv") into quantif_norm_matrices
 	file("*.rda") into rdata2pass
-	publishDir "${params.output_folder}/intermediate_files/expr_matrices", mode: 'copy'
-
+	publishDir "${params.output_folder}", mode: 'copy', saveAs: {filename ->
+        if (filename.indexOf(".csv") > 0) "expr_matrices/$filename"
+        else "Robjects/$filename"
+	}
+	
 	shell:
 	suffix = params.twopass == null ? " " : '_2pass'
 	'''
@@ -266,36 +277,54 @@ process SummarizedExperiment_create {
 	file quantif_norm_matrices
 	file quantif_count_matrices
 	file gtf
+	file merged_gtf4SE
 
 	output: 
-	file("*.rda") into rdata2passSE
-	publishDir "${params.output_folder}", mode: 'copy'
-
+	file("*.rda")
+	file("*_matrix*.csv")
+	publishDir "${params.output_folder}", mode: 'copy', saveAs: {filename ->
+        if (filename.indexOf(".csv") > 0) "expr_matrices/$filename"
+        else "Robjects/$filename"
+	}
+	
 	shell:
 	suffix = params.twopass == null ? "_1pass" : '_2pass'
+	if(merged_gtf4SE.name =='NO_FILE'){
+		gtf2use=gtf
+		gtf_path=params.gtf
+	}else{
+		gtf2use=merged_gtf4SE
+		gtf_path="${params.output_folder}/gtf/"+merged_gtf4SE.name
+	}
 	'''
-	if grep -q -E "GRCh38|hg38" !{gtf}
-		then genome=hg38
-	else if grep -q "GRCh37|hg19" !{gtf}
-			then genome=hg19
-		else genome="!{params.annot_genome}"
+	if [!{params.annot_genome} -eq "Unknown"]
+		then
+			if grep -q -E "GRCh37|hg19" !{gtf}
+				then genome=hg19
+			else 
+				genome=hg38
 		fi
-	fi
-	if grep -q -E "homo sapiens|human" !{gtf}
-		then organism='Homo sapiens'
 	else
-		organism="!{params.annot_organism}"
+		genome=!{params.annot_genome}
 	fi
-	if [`cat !{gtf} | grep provider | awk '{print $2}'` -eq ""]
-		then provider=!{params.annot_provider}
+	if [!{params.annot_provider} -eq "Unspecified"]
+		then
+			provider="Unspecified"
+			if [`cat !{gtf} | grep provider | awk '{print $2}'` -neq ""]
+				then provider=`cat !{gtf} | grep provider | awk '{print $2}'`
+			fi	
 	else
-		provider=`cat !{gtf} | grep provider | awk '{print $2}'`
+		provider=!{params.annot_provider}
 	fi
-	if [`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'` -eq ""]
-		then version=!{params.annot_version}
+	if [!{params.annot_version} -eq "Unspecified"]
+		then
+			version="Unspecified"
+			if [`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'` -neq ""]
+				then version=`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'`
+			fi
 	else
-		version=`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'`
+		version=!{params.annot_version}
 	fi
-	Rscript !{baseDir}/bin/create_summarizedExperiment.R !{gtf} ${provider} ${version} !{params.annot_genome} "!{params.annot_organism}" !{params.gtf} !{suffix} !{params.ref}
+	Rscript !{baseDir}/bin/create_summarizedExperiment.R !{gtf2use} ${provider} ${version} ${genome} "!{params.annot_organism}" !{gtf_path} !{suffix} !{params.ref}
 	'''
 }
