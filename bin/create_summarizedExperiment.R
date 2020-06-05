@@ -91,7 +91,7 @@ assays(txim) <- SimpleList(counts=assay(txim,"raw_counts"),length=assay(txim,"le
 
 # add exon information
 #exons <- exonsBy(mytxdb, by="tx",use.names=T) #tximeta:::getRanges(txdb = mytxdb, txomeInfo = txomeInfo, type = "exon")
-exons <- split(gr[gr$type=="exon",grep("exon" ,colnames(gr@elementMetadata))],
+exons <- split(gr[gr$type=="exon",grep("exon|type" ,colnames(gr@elementMetadata))],
                 names(gr)[gr$type=="exon"])
 exons <- exons[names(txim)]
 if (all(is.na(seqlengths(exons)))) {
