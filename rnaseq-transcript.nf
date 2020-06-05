@@ -275,7 +275,7 @@ process SummarizedExperiment_create {
 	input:
 	file ST_outs from ST_out4SE.collect()
 	file quantif_norm_matrices
-	file quantif_count_matrices
+	file count_mats from quantif_count_matrices.collect()
 	file gtf
 	file merged_gtf4SE
 
@@ -297,7 +297,7 @@ process SummarizedExperiment_create {
 		gtf_path="${params.output_folder}/gtf/"+merged_gtf4SE.name
 	}
 	'''
-	if [!{params.annot_genome} -eq "Unknown"]
+	if [ "!{params.annot_genome}" == "Unknown" ]
 		then
 			if grep -q -E "GRCh37|hg19" !{gtf}
 				then genome=hg19
@@ -307,19 +307,19 @@ process SummarizedExperiment_create {
 	else
 		genome=!{params.annot_genome}
 	fi
-	if [!{params.annot_provider} -eq "Unspecified"]
+	if [ "!{params.annot_provider}" == "Unspecified" ]
 		then
 			provider="Unspecified"
-			if [`cat !{gtf} | grep provider | awk '{print $2}'` -neq ""]
+			if [ `cat !{gtf} | grep provider | awk '{print $2}'` != "" ]
 				then provider=`cat !{gtf} | grep provider | awk '{print $2}'`
 			fi	
 	else
 		provider=!{params.annot_provider}
 	fi
-	if [!{params.annot_version} -eq "Unspecified"]
+	if [ "!{params.annot_version}" == "Unspecified" ]
 		then
 			version="Unspecified"
-			if [`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'` -neq ""]
+			if [ `cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'` != "" ]
 				then version=`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'`
 			fi
 	else

@@ -70,12 +70,13 @@ readlengths_txim = as.data.frame(matrix(rep(NA,ncol(txim)),nrow=1 ))
 colnames(readlengths_txim) = colnames(txim)
 for(i in 1:length(rcmat_list)) readlengths_txim[1,samples_rcmat_list[[i]]] = readlengths_rcmat_list[i]
 
-for(x in rcmat_list) x = x[match(rownames(txim),x$transcript_id),]
+#for(i in 1:length(rcmat_list)) rcmat_list[[i]] = rcmat_list[[i]][match(rownames(txim),rcmat_list[[i]]$transcript_id),]
+#rcmat = bind_cols(rcmat_list)
 rcmat = rcmat_list[[1]]
 if(length(rcmat_list)>1){ 
-    for(x in rcmat_list[-1]) rcmat = bind_cols(rcmat,x)
+    for(i in 2:length(rcmat_list)) rcmat = left_join(rcmat,rcmat_list[[i]],by="transcript_id")
 }
-rcmat = rcmat[,c("transcript_id",colnames(txim))]
+rcmat = rcmat[match(rownames(txim),rcmat$transcript_id),c("transcript_id",colnames(txim))]
 
 write_csv(rcmat,path=paste0("transcript_count_matrix",suffix,".csv"))
 rcmatdf = as.data.frame(rcmat[,-1])
@@ -131,12 +132,12 @@ names(assays(txim.genes))[names(assays(txim.genes))=="counts"] = "counts_length_
 rcmat_files_list.g = list.files(".",pattern = "gene_count_matrix",full.names = T)
 rcmat_list.g = lapply(rcmat_files_list.g, read_csv,col_names = T)
 
-for(x in rcmat_list.g) x = x[match(rownames(txim.genes),x$gene_id),]
+#for(x in rcmat_list.g) x = x[match(rownames(txim.genes),x$gene_id),]
 rcmat.g = rcmat_list.g[[1]]
 if(length(rcmat_list.g)>1){ 
-    for(x in rcmat_list.g[-1]) rcmat.g = bind_cols(rcmat.g,y)
+    for(i in 2:length(rcmat_list.g)) rcmat.g = left_join(rcmat.g,rcmat_list.g[[i]],by="gene_id")
 }
-rcmat.g = rcmat.g[,c("gene_id",colnames(txim.genes))]
+rcmat.g = rcmat.g[match(rownames(txim.genes),rcmat.g$gene_id),c("gene_id",colnames(txim.genes))]
 write_csv(rcmat.g,path=paste0("gene_count_matrix",suffix,".csv"))
 rcmatdf.g = as.data.frame(rcmat.g[,-1])
 rownames(rcmatdf.g) = rcmat.g$gene_id
@@ -146,6 +147,8 @@ colData(txim.genes)$readlength = readlengths_txim[1,]
 assays(txim.genes,withDimnames=F)$raw_counts = rcmatdf.g
 names(assays(txim.genes))[names(assays(txim.genes))=="abundance"] = "abundance_FPKM"
 assays(txim.genes)$abundance_TPM = sweep(assays(txim.genes)$abundance_FPKM, 2,colSums(assays(txim.genes)$abundance_FPKM),"/" )*10**6
+
+### check if still SimpleList in recent SummarizedExperiment versions
 assays(txim.genes) <- SimpleList(counts=assay(txim.genes,"raw_counts"),length=assay(txim.genes,"length"),abundance_FPKM=assay(txim.genes,"abundance_FPKM"),abundance_TPM=assay(txim.genes,"abundance_TPM") )
 
 #add exon information
