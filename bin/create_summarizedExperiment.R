@@ -70,8 +70,6 @@ readlengths_txim = as.data.frame(matrix(rep(NA,ncol(txim)),nrow=1 ))
 colnames(readlengths_txim) = colnames(txim)
 for(i in 1:length(rcmat_list)) readlengths_txim[1,samples_rcmat_list[[i]]] = readlengths_rcmat_list[i]
 
-#for(i in 1:length(rcmat_list)) rcmat_list[[i]] = rcmat_list[[i]][match(rownames(txim),rcmat_list[[i]]$transcript_id),]
-#rcmat = bind_cols(rcmat_list)
 rcmat = rcmat_list[[1]]
 if(length(rcmat_list)>1){ 
     for(i in 2:length(rcmat_list)) rcmat = left_join(rcmat,rcmat_list[[i]],by="transcript_id")
@@ -91,14 +89,11 @@ names(assays(txim))[names(assays(txim))=="abundance"] = "abundance_FPKM"
 assays(txim)$abundance_TPM = sweep(assays(txim)$abundance_FPKM, 2,colSums(assays(txim)$abundance_FPKM),"/" )*10**6
 assays(txim) <- SimpleList(counts=assay(txim,"raw_counts"),length=assay(txim,"length"),abundance_FPKM=assay(txim,"abundance_FPKM"),abundance_TPM=assay(txim,"abundance_TPM") )
 
-mytxdb = makeTxDbFromGFF(annot, dataSource=provider,organism=organism,taxonomyId=NA,
-                circ_seqs=circ_seqs,
-                chrominfo=seqinfo(gr),
-                miRBaseBuild=NA,
-                metadata=NULL)
-
 # add exon information
-exons <- exonsBy(mytxdb, by="tx",use.names=T) #tximeta:::getRanges(txdb = mytxdb, txomeInfo = txomeInfo, type = "exon")
+#exons <- exonsBy(mytxdb, by="tx",use.names=T) #tximeta:::getRanges(txdb = mytxdb, txomeInfo = txomeInfo, type = "exon")
+exons <- split(gr[gr$type=="exon",c("exon_id" ,"exon_name", "exon_number")[c("exon_id" ,"exon_name", "exon_number")%in%colnames(elementMetadata(gr))]],
+                names(gr)[gr$type=="exon"])
+exons <- exons[names(txim)]
 if (all(is.na(seqlengths(exons)))) {
     seqinfo(exons) <- seqinfo(txim)
 }
@@ -113,16 +108,24 @@ rm(txim)
 gc()
 
 ## 
-gr.g = genes(mytxdb)
+gr.g = gr[gr$type=="exon",]
 names(gr.g) <- gr.g$gene_id
+exons.g <- split(gr.g,names(gr.g) ) #groupGRangesBy(gr.g[gr.g$type=="exon",])
+exons.g <- exons.g[names(txim.genes)]
+
+genes2 = elementMetadata(unlist(exons.g))
+rownames(genes2) = genes2$gene_id
+genes2 = genes2[cumsum(elementNROWS(exons.g)),]
+genes2$type = "gene"
+
 assay.nms <- rownames(assay(txim.genes,"counts"))
 genes.missing <- !assay.nms %in% names(gr.g)
-genes2 <- gr.g[rownames(assay(txim.genes,"counts"))]
+genes2 <- genes2[rownames(assay(txim.genes,"counts")),]
 try(seqinfo(genes2) <- Seqinfo(genome = ucsc.genome)[seqlevels(genes2)])
 
 metadata.genes = metadata
 metadata.genes$level <- "gene"
-rowRanges(txim.genes) = genes2
+rowData(txim.genes) = genes2
 metadata(txim.genes)  = c(metadata(txim.genes),metadata.genes)
 metadata(txim.genes)$txomeInfo = txomeInfo
 
@@ -132,7 +135,6 @@ names(assays(txim.genes))[names(assays(txim.genes))=="counts"] = "counts_length_
 rcmat_files_list.g = list.files(".",pattern = "gene_count_matrix",full.names = T)
 rcmat_list.g = lapply(rcmat_files_list.g, read_csv,col_names = T)
 
-#for(x in rcmat_list.g) x = x[match(rownames(txim.genes),x$gene_id),]
 rcmat.g = rcmat_list.g[[1]]
 if(length(rcmat_list.g)>1){ 
     for(i in 2:length(rcmat_list.g)) rcmat.g = left_join(rcmat.g,rcmat_list.g[[i]],by="gene_id")
@@ -151,10 +153,8 @@ assays(txim.genes)$abundance_TPM = sweep(assays(txim.genes)$abundance_FPKM, 2,co
 ### check if still SimpleList in recent SummarizedExperiment versions
 assays(txim.genes) <- SimpleList(counts=assay(txim.genes,"raw_counts"),length=assay(txim.genes,"length"),abundance_FPKM=assay(txim.genes,"abundance_FPKM"),abundance_TPM=assay(txim.genes,"abundance_TPM") )
 
-#add exon information
-exons.g <- exonsBy(mytxdb, by="gene") #tximeta:::getRanges(txdb = mytxdb, txomeInfo = txomeInfo, type = "exon")
 if (all(is.na(seqlengths(exons.g)))) {
-    seqinfo(exons) <- seqinfo(txim.genes)
+    seqinfo(exons.g) <- seqinfo(exons)
 }
 exons.g <- exons.g[rownames(txim.genes)]
 stopifnot(all(rownames(txim.genes) == names(exons.g)))
