@@ -1,0 +1,85 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "https://raw.githubusercontent.com/IARCbioinfo/RNAseq-transcript-nf/master/nextflow_schema.json",
+    "title": "RNAseq-transcript-nf pipeline parameters",
+    "description": "This pipeline performs transcript identification and quantification from a series of BAM files using StringTie",
+    "type": "object",
+    "properties": {
+        "input_folder": {
+            "type": "string",
+            "description": "Folder containing RNA-seq BAM files",
+            "default": "."
+        },
+        "input_file": {
+            "type": "string",
+            "default": "null",
+            "description": "File in TSV format containing columns "ID" (sample ID), "bam" (path to RNA-seq BAM file), and "readlength" (the sample's read length)"
+        },
+        "gtf": {
+            "type": "string",
+            "description": "Annotation .gtf file",
+            "default": "null"
+        },
+        "output_folder": {
+            "type": "string",
+            "default": ".",
+            "description": "Folder where output is written"
+        },
+        "readlength": {
+            "type": "integer",
+            "description": "Mean read length for count computation (only if input_folder is used)",
+            "default": "75"
+        },
+        "mem": {
+            "type": "integer",
+            "description": "Size of memory used for mapping (in GB)",
+            "default": "2"
+        },
+        "cpu": {
+            "type": "integer",
+            "description": "Number of CPUs used by bwa mem and sambamba",
+            "default": "2"
+        },
+        "prepDE_input": {
+            "type": "string",
+            "description": "File given to script prepDE from StringTie",
+            "default": "NO_FILE"
+        },
+        "annot_organism": {
+            "type": "string",
+            "description": "Metainformation stored in SummarizedExperiment R object",
+            "default": "Homo sapiens"
+        },
+        "annot_genome": {
+            "type": "string",
+            "description": "Metainformation stored in SummarizedExperiment R object",
+            "default": "Unknown"
+        },
+        "annot_provider": {
+            "type": "string",
+            "description": "Metainformation stored in SummarizedExperiment R object",
+            "default": "Unspecified"
+        },
+        "annot_version": {
+            "type": "string",
+            "description": "Metainformation stored in SummarizedExperiment R object",
+            "default": "Unspecified"
+        },
+        "ref": {
+            "type": "string",
+            "description": "Metainformation stored in SummarizedExperiment R object",
+            "default": "Unspecified"
+        },
+        "twopass": {
+            "type": "boolean",
+            "description": "Enable StringTie 2-pass mode"
+        },
+        "help": {
+            "type": "boolean",
+            "description": "Display help"
+        }
+    },
+    "required": [
+        "gtf"
+    ]
+}
