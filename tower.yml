@@ -1,0 +1,9 @@
+reports:
+    "expr_matrices/gene_count_matrix**.csv":
+        display: "Gene count matrix"
+    "expr_matrices/gene_FPKM_matrix.csv":
+        display: "Gene FPKM matrix"
+    "expr_matrices/transcript_count_matrix**.csv":
+        display: "Transcript count matrix"
+    "expr_matrices/transcript_FPKM_matrix.csv":
+        display: "Transcript FPKM matrix"
