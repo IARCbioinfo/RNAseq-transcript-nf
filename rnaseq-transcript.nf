@@ -1,21 +1,11 @@
 #!/usr/bin/env nextflow
+
+// Copyright (C) 2026 IARC/WHO
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+// See the GNU General Public License for more details <http://www.gnu.org/licenses/>.
+
 nextflow.enable.dsl = 2
-
-// Copyright (C) 2017 IARC/WHO
-
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 
 // --------------------------------------------------
 // PARAMETERS
@@ -37,74 +27,25 @@ params.annot_version  = "Unspecified"
 params.ref = "Unspecified"
 params.help = null
 
-gtf = file(params.gtf)
-prepDE_input = Channel.value(file(params.prepDE_input))
-
-log.info ""
-log.info "-----------------------------------------------------------------"
-log.info "RNAseq-transcript-nf 2.2: gene- and transcript-level           "
-log.info "expression quantification from RNA sequencing data with StringTie"
-log.info "-----------------------------------------------------------------"
-log.info "Copyright (C) IARC/WHO"
-log.info "This program comes with ABSOLUTELY NO WARRANTY; for details see LICENSE"
-log.info "This is free software, and you are welcome to redistribute it"
-log.info "under certain conditions; see LICENSE for details."
-log.info "--------------------------------------------------------"
-log.info ""
-
-// --------------------------------------------------
-// HELP
-// --------------------------------------------------
-
-if (params.help) {
-    log.info "--------------------------------------------------------"
-    log.info "  USAGE                                                 "
-    log.info "--------------------------------------------------------"
-    log.info ""
-    log.info "nextflow run iarcbioinfo/rnaseq-transcript-nf [-profile <docker/singularity/conda>] [OPTIONS]"
-    log.info ""
-    log.info "Mandatory arguments:"
-    log.info '    --input_folder   FOLDER                  Folder containing RNA-seq BAM files whose expression to quantify.'
-    log.info '    --gtf            FILE                    Annotation file.'
-    log.info ""
-    log.info "Optional arguments:"
-	log.info '    --input_file     FILE                    File in TSV format containing columns "ID" (sample ID), "bam" '
-	log.info '											   (path to RNA-seq BAM file), and "readlength" (sample read length)'
-    log.info '    --output_folder  STRING                  Output folder (default: .).'
-	log.info '    --readlength     STRING                  Mean read length for count computation (default: 75).'
-	log.info '    --prepDE_input   FILE					   File given to script prepDE from StringTie (default: none).'
-	log.info '    --annot_organism, '
-	log.info '    --annot_genome, '
-	log.info '    --annot_provider,'
-	log.info '    --annot_version,'
-	log.info '    --ref 		   STRINGS				   metainformation stored in SummarizedExperiment R object'
-	log.info '					    					   (default: "Homo sapiens","hg38", Unknown, Unknown, Unknown)'
-    log.info '    --cpu            INTEGER                 Number of cpu used by bwa mem and sambamba (default: 2).'
-    log.info '    --mem            INTEGER                 Size of memory used for mapping (in GB) (default: 2).' 
-    log.info ""
-    log.info "Flags:"
-    log.info "--twopass                                    Enable StringTie 2pass mode"
-    log.info ""
-    exit 0
-} else {
-/* Software information */
-   log.info "input_folder	= ${params.input_folder}"
-   log.info "input_file		= ${params.input_file}"
-   log.info "cpu			= ${params.cpu}"
-   log.info "mem			= ${params.mem}"
-   log.info "readlength		= ${params.readlength}"
-   log.info "output_folder	= ${params.output_folder}"
-   log.info "gtf			= ${params.gtf}"
-   log.info "twopass		= ${params.twopass}"
-   log.info "params.prepDE_input = ${params.prepDE_input}"
-   log.info "annot_organism	= ${params.annot_organism}"
-   log.info "annot_genome	= ${params.annot_genome}"
-   log.info "annot_provider	= ${params.annot_provider}"
-   log.info "annot_version	= ${params.annot_version}"
-   log.info "ref			= ${params.ref}"
-   log.info "help:            ${params.help}"
+//Header for the IARC tools - logo generated using the following page : http://patorjk.com/software/taag  (ANSI logo generator)
+def IARC_Header (){
+     return  """
+#################################################################################
+# ██╗ █████╗ ██████╗  ██████╗██████╗ ██╗ ██████╗ ██╗███╗   ██╗███████╗ ██████╗  #
+# ██║██╔══██╗██╔══██╗██╔════╝██╔══██╗██║██╔═══██╗██║████╗  ██║██╔════╝██╔═══██╗ #
+# ██║███████║██████╔╝██║     ██████╔╝██║██║   ██║██║██╔██╗ ██║█████╗  ██║   ██║ #
+# ██║██╔══██║██╔══██╗██║     ██╔══██╗██║██║   ██║██║██║╚██╗██║██╔══╝  ██║   ██║ #
+# ██║██║  ██║██║  ██║╚██████╗██████╔╝██║╚██████╔╝██║██║ ╚████║██║     ╚██████╔╝ #
+# ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═════╝ ╚═╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝╚═╝      ╚═════╝  #
+# Nextflow pipelines for cancer genomics.########################################
+"""
 }
 
+// --------------------------------------------------
+// FILE DEFINITION
+// --------------------------------------------------
+gtf = file(params.gtf)
+prepDE_input = Channel.value(file(params.prepDE_input))
 
 // --------------------------------------------------
 // INPUT CHANNELS
@@ -339,6 +280,76 @@ process SUMMARIZEDEXPERIMENT {
 // --------------------------------------------------
 
 workflow {
+
+  		log.info IARC_Header()
+// --------------------------------------------------
+// INFO / HELP
+// --------------------------------------------------
+
+log.info ""
+log.info "----------------------------------------------------------------------------------------------------------------------"
+log.info "RNAseq-transcript-nf 2.2: gene- and transcript-level expression quantification from RNA sequencing data with StringTie"
+log.info "----------------------------------------------------------------------------------------------------------------------"
+log.info "Copyright (C) IARC/WHO"
+log.info "This program comes with ABSOLUTELY NO WARRANTY; for details see LICENSE"
+log.info "This is free software, and you are welcome to redistribute it under certain conditions; see LICENSE for details."
+log.info "----------------------------------------------------------------------------------------------------------------------"
+log.info ""
+
+// --------------------------------------------------
+// INFO / HELP
+// --------------------------------------------------
+
+if (params.help) {
+    log.info "--------------------------------------------------------"
+    log.info "  USAGE                                                 "
+    log.info "--------------------------------------------------------"
+    log.info ""
+    log.info "nextflow run iarcbioinfo/rnaseq-transcript-nf [-profile <docker/singularity/conda>] [OPTIONS]"
+    log.info ""
+    log.info "Mandatory arguments:"
+    log.info '    --input_folder   FOLDER                  Folder containing RNA-seq BAM files whose expression to quantify.'
+    log.info '    --gtf            FILE                    Annotation file.'
+    log.info ""
+    log.info "Optional arguments:"
+	log.info '    --input_file     FILE                    File in TSV format containing columns "ID" (sample ID), "bam" '
+	log.info '											   (path to RNA-seq BAM file), and "readlength" (sample read length)'
+    log.info '    --output_folder  STRING                  Output folder (default: .).'
+	log.info '    --readlength     STRING                  Mean read length for count computation (default: 75).'
+	log.info '    --prepDE_input   FILE					   File given to script prepDE from StringTie (default: none).'
+	log.info '    --annot_organism, '
+	log.info '    --annot_genome, '
+	log.info '    --annot_provider,'
+	log.info '    --annot_version,'
+	log.info '    --ref 		   STRINGS				   metainformation stored in SummarizedExperiment R object'
+	log.info '					    					   (default: "Homo sapiens","hg38", Unknown, Unknown, Unknown)'
+    log.info '    --cpu            INTEGER                 Number of cpu used by bwa mem and sambamba (default: 2).'
+    log.info '    --mem            INTEGER                 Size of memory used for mapping (in GB) (default: 2).' 
+    log.info ""
+    log.info "Flags:"
+    log.info "--twopass                                    Enable StringTie 2pass mode"
+    log.info ""
+    exit 0
+} else {
+/* Software information */
+   log.info "input_folder	= ${params.input_folder}"
+   log.info "input_file		= ${params.input_file}"
+   log.info "cpu			= ${params.cpu}"
+   log.info "mem			= ${params.mem}"
+   log.info "readlength		= ${params.readlength}"
+   log.info "output_folder	= ${params.output_folder}"
+   log.info "gtf			= ${params.gtf}"
+   log.info "twopass		= ${params.twopass}"
+   log.info "params.prepDE_input = ${params.prepDE_input}"
+   log.info "annot_organism	= ${params.annot_organism}"
+   log.info "annot_genome	= ${params.annot_genome}"
+   log.info "annot_provider	= ${params.annot_provider}"
+   log.info "annot_version	= ${params.annot_version}"
+   log.info "ref			= ${params.ref}"
+   log.info "help:            ${params.help}"
+}
+
+// RUN PROCESSES
 
     STRINGTIE_1STPASS(bam_1pass, gtf)
 
