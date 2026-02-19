@@ -52,8 +52,6 @@ prepDE_input = Channel.value(params.prepDE_input)
 // INPUT CHANNELS
 // --------------------------------------------------
 
-Channel bam_files
-
 if (params.input_file) {
 
     bam_files = Channel
@@ -359,28 +357,27 @@ if (params.help) {
         STRINGTIE_2NDPASS(
             bam_2pass,
             MERGE_GTF.out.merged_gtf,
-            gtf
-        )
+            gtf)
 
-        st_final = STRINGTIE_2NDPASS.out.st2
-		merged_gtf4se = MERGE_GTF.out.merged_gtf
+        st_final_ch = STRINGTIE_2NDPASS.out.st2
+		merged_gtf4se_ch = MERGE_GTF.out.merged_gtf
 
     } else {
-        st_final = STRINGTIE_1STPASS.out.st1
-		merged_gtf4se = Channel.empty()
+        st_final_ch = STRINGTIE_1STPASS.out.st1
+		merged_gtf4se_ch = Channel.empty()
     }
 
-    grouped = st_final.groupTuple(by: 1)
+    grouped = st_final_ch.groupTuple(by: 1)
 
     PREPDE(grouped, prepDE_input)
 
-    BALLGOWN(st_final.collect())
+    BALLGOWN(st_final_ch.collect())
 	
 	SUMMARIZEDEXPERIMENT(
-        st_final.collect(),
+        st_final_ch.collect(),
         BALLGOWN.out.norm_matrices,
         PREPDE.out.count_matrices.collect(),
         gtf,
-        merged_gtf4se
+        merged_gtf4se_ch
     )
 }
