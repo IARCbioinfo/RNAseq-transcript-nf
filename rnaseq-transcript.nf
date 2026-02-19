@@ -44,8 +44,9 @@ def IARC_Header (){
 // --------------------------------------------------
 // FILE DEFINITION
 // --------------------------------------------------
-gtf = file(params.gtf)
-prepDE_input = Channel.value(file(params.prepDE_input))
+gtf = params.gtf ? file(params.gtf) : null
+if (!params.gtf) error "GTF file is required"
+prepDE_input = Channel.value(params.prepDE_input)
 
 // --------------------------------------------------
 // INPUT CHANNELS
@@ -61,18 +62,12 @@ if (params.input_file) {
         .map { row -> tuple(row.ID, row.readlength as Integer, file(row.bam)) }
 
 } else {
-
-    if (file(params.input_folder).listFiles().findAll { it.name ==~ /.*bam/ }) {
-
-        bam_files = Channel
-            .fromPath("${params.input_folder}/*.bam")
-            .map { bam -> tuple(bam.baseName, params.readlength, bam) }
-
-    } else {
-        error "No BAM files found"
-    }
+	 bam_files = Channel
+    	.fromPath("${params.input_folder}/*.bam")
+    	.ifEmpty { error "No BAM files found" }
+    	.map { bam -> tuple(bam.baseName, params.readlength, bam) }
+    } 
 }
-
 bam_files.into { bam_1pass; bam_2pass }
 
 // --------------------------------------------------
@@ -115,7 +110,7 @@ process STRINGTIE_1STPASS {
     stringtie \$opts -p ${params.cpu} -G ${gtf} -l ${sample_id} ${bam}
 
     mkdir ${sample_id}
-    mv *_ST.gtf ${sample_id}/
+    mv ${sample_id}_*.gtf ${sample_id}/
     mv *.tab ${sample_id}/ 2>/dev/null || true
     cp .command.log \$log
     """
@@ -255,7 +250,7 @@ process SUMMARIZEDEXPERIMENT {
     """
     suffix=\$( [[ -n "${params.twopass}" ]] && echo "_2pass" || echo "_1pass" )
 
-    if [[ "${merged_gtf.name}" == "NO_FILE" ]]; then
+    if (merged_gtf); then
         gtf2use=${gtf}
         gtf_path=${params.gtf}
     else
@@ -355,7 +350,11 @@ if (params.help) {
 
     if (params.twopass) {
 
-        MERGE_GTF(STRINGTIE_1STPASS.out.st1.collect(), gtf)
+        MERGE_GTF(
+    		STRINGTIE_1STPASS.out.st1
+        	.map { it[0] }
+        	.collect(),
+			gtf)
 
         STRINGTIE_2NDPASS(
             bam_2pass,
@@ -368,7 +367,7 @@ if (params.help) {
 
     } else {
         st_final = STRINGTIE_1STPASS.out.st1
-		merged_gtf4se = Channel.value(file('NO_FILE'))
+		merged_gtf4se = Channel.empty()
     }
 
     grouped = st_final.groupTuple(by: 1)
