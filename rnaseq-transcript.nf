@@ -84,17 +84,18 @@ process STRINGTIE_1STPASS {
     path gtf
 
     output:
-    tuple path(sample_id), val(readlength), emit: st1
+    tuple path("${sample_id}"), val(readlength), emit: st1
     path "*.log", emit: logs
 
     publishDir params.output_folder, mode: 'copy',
         saveAs: { f ->
-            f.name.endsWith('.log')
-                ? "logs/${f.name}"
-                : params.twopass
-                    ? "intermediate_files/sample_folders/ST1of2passes/${f.name}"
-                    : "intermediate_files/sample_folders/ST1pass/${f.name}"
-        }
+    def fname = f instanceof Path ? f.name : f.toString()
+    fname.endsWith('.log')
+        ? "logs/${fname}"
+        : params.twopass
+            ? "intermediate_files/sample_folders/ST1of2passes/${fname}"
+            : "intermediate_files/sample_folders/ST1pass/${fname}"
+}
 
     script:
     """
