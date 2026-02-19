@@ -48,7 +48,7 @@ gtf = params.gtf ? file(params.gtf) : null
 if (!params.gtf) error "GTF file is required"
 prepDE_input = Channel.value(
     params.prepDE_input ? file(params.prepDE_input) : null
-
+)
 // --------------------------------------------------
 // INPUT CHANNELS
 // --------------------------------------------------
