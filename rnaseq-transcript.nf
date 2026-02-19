@@ -373,10 +373,14 @@ if (params.help) {
 
     PREPDE(grouped, prepDE_input)
 
-    BALLGOWN(st_final_ch.collect())
+   BALLGOWN(
+    st_final_ch
+        .map { it[0] }
+        .collect()
+)
 	
 	SUMMARIZEDEXPERIMENT(
-        st_final_ch.collect(),
+        st_final_ch.map { it[0] }.collect(),
         BALLGOWN.out.norm_matrices,
         PREPDE.out.count_matrices.collect(),
         gtf,
