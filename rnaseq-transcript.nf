@@ -17,7 +17,7 @@ params.output_folder = "."
 params.mem  = 2
 params.cpu  = 2
 params.gtf  = null
-params.prepDE_input = 'NO_FILE'
+params.prepDE_input = null
 params.readlength = 75
 params.twopass  = null
 params.annot_organism = "Homo sapiens"
@@ -46,9 +46,8 @@ def IARC_Header (){
 // --------------------------------------------------
 gtf = params.gtf ? file(params.gtf) : null
 if (!params.gtf) error "GTF file is required"
-prepDE_input = Channel.value(
-    params.prepDE_input ? file(params.prepDE_input) : null
-)
+prepDE_input = Channel.value(params.prepDE_input)
+
 // --------------------------------------------------
 // INPUT CHANNELS
 // --------------------------------------------------
@@ -191,7 +190,7 @@ process PREPDE {
 
     script:
     """
-    if [[ "${prep_input}" == "null" ]]; then
+    if [[ -z "${prep_input}" || "${prep_input}" == "null" ]]; then
     	input="."
 	else
     	input="${prep_input}"
