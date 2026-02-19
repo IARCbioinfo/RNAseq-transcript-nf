@@ -67,7 +67,7 @@ if (params.input_file) {
     	.ifEmpty { error "No BAM files found" }
     	.map { bam -> tuple(bam.baseName, params.readlength, bam) }
     } 
-}
+
 bam_files.into { bam_1pass; bam_2pass }
 
 // --------------------------------------------------
