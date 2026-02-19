@@ -46,9 +46,8 @@ def IARC_Header (){
 // --------------------------------------------------
 gtf = params.gtf ? file(params.gtf) : null
 if (!params.gtf) error "GTF file is required"
-prepDE_input = params.prepDE_input ?
-    Channel.value(file(params.prepDE_input)) :
-    Channel.empty()
+prepDE_input = Channel.value(
+    params.prepDE_input ? file(params.prepDE_input) : null
 
 // --------------------------------------------------
 // INPUT CHANNELS
@@ -183,7 +182,7 @@ process PREPDE {
 
     input:
     tuple path(st_dirs), val(readlength)
-    path prep_input, optional true
+    val prep_input
 
     output:
     path "*count_matrix*.csv", emit: count_matrices
@@ -192,7 +191,7 @@ process PREPDE {
 
     script:
     """
-    if [[ -z "${prep_input}" ]]; then
+    if [[ "${prep_input}" == "null" ]]; then
     	input="."
 	else
     	input="${prep_input}"
