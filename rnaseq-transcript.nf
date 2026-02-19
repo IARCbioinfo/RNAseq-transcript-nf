@@ -183,7 +183,7 @@ process PREPDE {
 
     input:
     tuple path(st_dirs), val(readlength)
-    path prep_input optional true
+    path prep_input, optional true
 
     output:
     path "*count_matrix*.csv", emit: count_matrices
