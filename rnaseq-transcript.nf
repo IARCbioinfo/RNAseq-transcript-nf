@@ -112,6 +112,7 @@ process STRINGTIE_1STPASS {
     mkdir ${sample_id}
     mv ${sample_id}_*.gtf ${sample_id}/
     mv *.tab ${sample_id}/ 2>/dev/null || true
+	mv *.ctab ${sample_id}/ 2>/dev/null || true
     cp .command.log \$log
     """
 }
@@ -169,6 +170,7 @@ process STRINGTIE_2NDPASS {
     mkdir ${sample_id}
     mv *_2pass_ST.gtf ${sample_id}/
     mv *.tab ${sample_id}/
+	mv *.ctab ${sample_id}/ 2>/dev/null || true
     cp .command.log ${sample_id}_2pass.log
     """
 }
