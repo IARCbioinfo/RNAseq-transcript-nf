@@ -103,16 +103,12 @@ process STRINGTIE_1STPASS {
         opts="-o ${sample_id}_1of2passes_ST.gtf"
         log="${sample_id}_1of2passes.log"
     else
-        opts="-o ${sample_id}_1pass_ST.gtf -e -B -A ${sample_id}_pass1_gene_abund.tab"
+        opts="-o ${sample_id}/${sample_id}_1pass_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass1_gene_abund.tab"
         log="${sample_id}_1pass.log"
     fi
 
-    stringtie \$opts -p ${params.cpu} -G ${gtf} -l ${sample_id} ${bam}
+    stringtie \$opts -p ${params.cpu} -G ${gtf} ${bam}
 
-    mkdir ${sample_id}
-    mv ${sample_id}_*.gtf ${sample_id}/
-    mv *.tab ${sample_id}/ 2>/dev/null || true
-	mv *.ctab ${sample_id}/ 2>/dev/null || true
     cp .command.log \$log
     """
 }
