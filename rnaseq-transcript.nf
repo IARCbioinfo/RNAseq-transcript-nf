@@ -74,7 +74,6 @@ bam_2pass = bam_files
 // --------------------------------------------------
 
 process STRINGTIE_1STPASS {
-
     cpus params.cpu
     memory "${params.mem}G"
     tag { sample_id }
@@ -98,17 +97,20 @@ process STRINGTIE_1STPASS {
 }
 
     script:
+
+	def opts
+	def log
+
+	if (params.twopass) {
+    	opts = "-o ${sample_id}/${sample_id}_1of2passes_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass1_gene_abund.tab"
+    	log  = "${sample_id}_1of2passes.log"
+	} else {
+    	opts = "-o ${sample_id}/${sample_id}_1pass_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass1_gene_abund.tab"
+    	log  = "${sample_id}_1pass.log"
+	}
+
     """
-    if [[ -n "${params.twopass}" ]]; then
-        opts="-o ${sample_id}/${sample_id}_1of2passes_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass1_gene_abund.tab"
-        log="${sample_id}_1of2passes.log"
-    else
-        opts="-o ${sample_id}/${sample_id}_1pass_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass1_gene_abund.tab"
-        log="${sample_id}_1pass.log"
-    fi
-
     stringtie \$opts -p ${params.cpu} -G ${gtf} -l ${sample_id} ${bam}
-
     cp .command.log \$log
     """
 }
@@ -183,17 +185,14 @@ process PREPDE {
     publishDir "${params.output_folder}/intermediate_files/expr_matrices", mode: 'copy'
 
     script:
-    """
-    if [[ -z "${prep_input}" || "${prep_input}" == "null" ]]; then
-    	input="."
-	else
-    	input="${prep_input}"
-	fi
-    suffix=\$( [[ -n "${params.twopass}" ]] && echo "_2pass" || echo "" )
 
-    prepDE.py -i \$input -l ${readlength} \
-        -g gene_count_matrix\${suffix}_l${readlength}.csv \
-        -t transcript_count_matrix\${suffix}_l${readlength}.csv
+	def input_dir = (prep_input && prep_input != "null") ? prep_input : "."
+    def suffix    = params.twopass ? "_2pass" : ""
+
+    """
+	prepDE.py -i ${input_dir} -l ${readlength} \
+        -g gene_count_matrix${suffix}_l${readlength}.csv \
+        -t transcript_count_matrix${suffix}_l${readlength}.csv
     """
 }
 
@@ -218,8 +217,8 @@ process BALLGOWN {
         }
 
     script:
+	def suffix = params.twopass ? "_2pass" : ""
     """
-    suffix=\$( [[ -n "${params.twopass}" ]] && echo "_2pass" || echo "" )
     Rscript ${baseDir}/bin/create_matrices.R \$suffix
     """
 }
@@ -242,31 +241,34 @@ process SUMMARIZEDEXPERIMENT {
 
     publishDir params.output_folder, mode: 'copy',
         saveAs: { f ->
-            f.name.endsWith('.csv')
-                ? "expr_matrices/${f.name}"
-                : "Robjects/${f.name}"
+            def fname = f.toString().tokenize('/').last()
+            fname.endsWith('.csv')
+                ? "expr_matrices/${fname}"
+                : "Robjects/${fname}"
         }
 
     script:
+	def suffix = params.twopass ? "_2pass" : "_1pass"
+    def gtf2use
+    def gtf_path
+
+ 	if (merged_gtf) {
+        gtf2use  = gtf
+        gtf_path = params.gtf
+    } else {
+        gtf2use  = merged_gtf
+        gtf_path = "${params.output_folder}/gtf/${merged_gtf.getName()}"
+    }
+
     """
-    suffix=\$( [[ -n "${params.twopass}" ]] && echo "_2pass" || echo "_1pass" )
-
-    if (merged_gtf); then
-        gtf2use=${gtf}
-        gtf_path=${params.gtf}
-    else
-        gtf2use=${merged_gtf}
-        gtf_path=${params.output_folder}/gtf/${merged_gtf.name}
-    fi
-
-    Rscript ${baseDir}/bin/create_summarizedExperiment.R \\
-        \$gtf2use \\
-        "${params.annot_provider}" \\
-        "${params.annot_version}" \\
-        "${params.annot_genome}" \\
-        "${params.annot_organism}" \\
-        \$gtf_path \\
-        \$suffix \\
+    Rscript ${baseDir}/bin/create_summarizedExperiment.R \
+        ${gtf2use} \
+        "${params.annot_provider}" \
+        "${params.annot_version}" \
+        "${params.annot_genome}" \
+        "${params.annot_organism}" \
+        ${gtf_path} \
+        ${suffix} \
         ${params.ref}
     """
 }
