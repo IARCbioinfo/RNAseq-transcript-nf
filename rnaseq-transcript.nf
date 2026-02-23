@@ -107,7 +107,7 @@ process STRINGTIE_1STPASS {
         log="${sample_id}_1pass.log"
     fi
 
-    stringtie \$opts -p ${params.cpu} -G ${gtf} ${bam}
+    stringtie \$opts -p ${params.cpu} -G ${gtf} -l ${sample_id} ${bam}
 
     cp .command.log \$log
     """
@@ -161,7 +161,7 @@ process STRINGTIE_2NDPASS {
     script:
     """
     stringtie -o ${sample_id}/${sample_id}_2pass_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass2_gene_abund.tab \
-        -p ${params.cpu} -G ${merged_gtf} ${bam}
+        -p ${params.cpu} -G ${merged_gtf} -l ${sample_id} ${bam}
 
 cp .command.log ${sample_id}_2pass.log
     """
@@ -209,9 +209,12 @@ process BALLGOWN {
     path "*_matrix*.csv", emit: norm_matrices
     path "*.rda", emit: rdata
 
-    publishDir params.output_folder, mode: 'copy',
+   publishDir params.output_folder, mode: 'copy',
         saveAs: { f ->
-            f.name.endsWith('.csv') ? "expr_matrices/${f.name}" : "Robjects/${f.name}"
+            def fname = f.toString().tokenize('/').last()
+            fname.endsWith('.csv') ?
+                "expr_matrices/${fname}" :
+                "Robjects/${fname}"
         }
 
     script:
