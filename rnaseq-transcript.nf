@@ -100,7 +100,7 @@ process STRINGTIE_1STPASS {
     script:
     """
     if [[ -n "${params.twopass}" ]]; then
-        opts="-o ${sample_id}_1of2passes_ST.gtf"
+        opts="-o ${sample_id}/${sample_id}_1of2passes_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass1_gene_abund.tab"
         log="${sample_id}_1of2passes.log"
     else
         opts="-o ${sample_id}/${sample_id}_1pass_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass1_gene_abund.tab"
@@ -160,14 +160,10 @@ process STRINGTIE_2NDPASS {
 
     script:
     """
-    stringtie -o ${sample_id}_2pass_ST.gtf -e -B -A ${sample_id}_pass2_gene_abund.tab \
+    stringtie -o ${sample_id}/${sample_id}_2pass_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass2_gene_abund.tab \
         -p ${params.cpu} -G ${merged_gtf} ${bam}
 
-    mkdir ${sample_id}
-    mv *_2pass_ST.gtf ${sample_id}/
-    mv *.tab ${sample_id}/
-	mv *.ctab ${sample_id}/ 2>/dev/null || true
-    cp .command.log ${sample_id}_2pass.log
+cp .command.log ${sample_id}_2pass.log
     """
 }
 
