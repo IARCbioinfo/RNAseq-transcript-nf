@@ -219,7 +219,7 @@ process BALLGOWN {
     script:
 	def suffix = params.twopass ? "_2pass" : ""
     """
-    Rscript ${baseDir}/bin/create_matrices.R \$suffix
+    Rscript ${baseDir}/bin/create_matrices.R ${suffix}
     """
 }
 
