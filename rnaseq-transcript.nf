@@ -111,7 +111,7 @@ process STRINGTIE_1STPASS {
 
     """
     stringtie ${opts} -p ${params.cpu} -G ${gtf} -l ${sample_id} ${bam}
-    cp .command.log \$log
+    cp .command.log ${log}
     """
 }
 
