@@ -372,9 +372,11 @@ if (params.help) {
 		merged_gtf4se_ch = Channel.empty()
     }
 
-    grouped = st_final_ch.groupTuple(by: 1)
+    grouped = st_final_ch
+    .groupTuple(by: 1)
+    .map { readlength, dirs -> tuple(dirs, readlength) }
 
-    PREPDE(grouped, prepDE_input)
+    PREPDE(grouped, params.prepDE_input)
 
    BALLGOWN(
     st_final_ch
