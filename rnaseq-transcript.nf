@@ -376,7 +376,7 @@ if (params.help) {
     .groupTuple(by: 1)
     .map { readlength, dirs -> tuple(dirs, readlength) }
 
-    PREPDE(grouped, params.prepDE_input)
+    PREPDE(grouped, Channel.value(params.prepDE_input))
 
    BALLGOWN(
     st_final_ch
