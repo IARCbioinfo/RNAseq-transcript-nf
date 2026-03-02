@@ -66,7 +66,7 @@ if (params.input_file) {
     	.map { bam -> tuple(bam.baseName, params.readlength, bam) }
     } 
 
-bam_files.into { bam_1pass; bam_2pass }
+def (bam_1pass, bam_2pass) = bam_files.into(2)
 
 // --------------------------------------------------
 // PROCESSES
