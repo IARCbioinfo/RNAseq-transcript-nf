@@ -66,7 +66,6 @@ if (params.input_file) {
     	.map { bam -> tuple(bam.baseName, params.readlength, bam) }
     } 
 
-def (bam_1pass, bam_2pass) = bam_files.into(2)
 
 // --------------------------------------------------
 // PROCESSES
@@ -348,7 +347,7 @@ if (params.help) {
 
 // RUN PROCESSES
 
-    STRINGTIE_1STPASS(bam_1pass, gtf)
+    STRINGTIE_1STPASS(bam_files, gtf)
 
     if (params.twopass) {
 
@@ -359,7 +358,7 @@ if (params.help) {
 			gtf)
 
         STRINGTIE_2NDPASS(
-            bam_2pass,
+            bam_files,
             MERGE_GTF.out.merged_gtf,
             gtf)
 
@@ -371,11 +370,13 @@ if (params.help) {
 		merged_gtf4se_ch = Channel.value(null)
     }
 
-    grouped = st_final_ch
-    .groupTuple(by: 1)
-    .map { readlength, dirs -> tuple(dirs, readlength) }
-
-    PREPDE(grouped, Channel.value(params.prepDE_input))
+ PREPDE(
+    st_final_ch
+        .map { it[0] }
+        .collect()
+        .map { dirs -> tuple(dirs, params.readlength) },
+    Channel.value(params.prepDE_input)
+)
 
    BALLGOWN(
     st_final_ch
