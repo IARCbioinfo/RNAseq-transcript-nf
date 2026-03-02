@@ -369,7 +369,7 @@ if (params.help) {
 
     } else {
         st_final_ch = STRINGTIE_1STPASS.out.st1
-		merged_gtf4se_ch = Channel.empty()
+		merged_gtf4se_ch = Channel.value(null)
     }
 
     grouped = st_final_ch
