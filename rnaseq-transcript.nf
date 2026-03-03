@@ -344,11 +344,6 @@ if (params.help) {
    log.info "help:            ${params.help}"
 }
 
-prepDE_input_ch = Channel.value(
-    params.prepDE_input ?: "."
-)
-
-
 // RUN PROCESSES
 
     STRINGTIE_1STPASS(bam_files, gtf)
@@ -374,21 +369,27 @@ prepDE_input_ch = Channel.value(
 		merged_gtf4se_ch = Channel.value(null)
     }
 
+st_dirs_ch = st_final_ch
+    .map { it[0] }
+    .collect()
+
+prepDE_input_ch = Channel.value(
+    params.prepDE_input ?: "."
+)
+
  PREPDE(
     st_dirs_ch.map { dirs -> tuple(dirs, params.readlength) },
     prepDE_input_ch
 )
 
    BALLGOWN(
-    st_final_ch
-        .map { it[0] }
-        .collect()
+    st_dirs_ch
 )
 	
 	SUMMARIZEDEXPERIMENT(
-        st_final_ch.map { it[0] }.collect(),
+        st_dirs_ch,
         BALLGOWN.out.norm_matrices,
-        PREPDE.out.count_matrices.collect(),
+        PREPDE.out.count_matrices,
         gtf,
         merged_gtf4se_ch
     )
