@@ -150,12 +150,15 @@ process STRINGTIE_2NDPASS {
     tuple path(sample_id), val(readlength), emit: st2
     path "*.log", emit: logs
 
-    publishDir params.output_folder, mode: 'copy',
-        saveAs: { f ->
-            f.name.endsWith('.log')
-                ? "logs/${f.name}"
-                : "intermediate_files/sample_folders/ST2pass/${f.name}"
-        }
+	publishDir params.output_folder, mode: 'copy',
+    saveAs: { f ->
+
+        def fname = f instanceof Path ? f.name : f.toString()
+
+        fname.endsWith('.log')
+            ? "logs/${fname}"
+            : "intermediate_files/sample_folders/ST2pass/${fname}"
+    }
 
     script:
     """
