@@ -229,8 +229,8 @@ process SUMMARIZEDEXPERIMENT {
     path st_dirs
     path norm_matrices
     path count_matrices
-    path gtf
-    path merged_gtf
+    path annotation_gtf
+	val gtf_path
 
     output:
     path "*.rda"
@@ -246,20 +246,10 @@ process SUMMARIZEDEXPERIMENT {
 
     script:
 	def suffix = params.twopass ? "_2pass" : "_1pass"
-    def gtf2use
-    def gtf_path
-
- 	if (merged_gtf) {
-        gtf2use  = gtf
-        gtf_path = params.gtf
-    } else {
-        gtf2use  = merged_gtf
-        gtf_path = "${params.output_folder}/gtf/${merged_gtf.getName()}"
-    }
 
     """
     Rscript ${baseDir}/bin/create_summarizedExperiment.R \
-        ${gtf2use} \
+        ${annotation_gtf} \
         "${params.annot_provider}" \
         "${params.annot_version}" \
         "${params.annot_genome}" \
@@ -364,9 +354,17 @@ if (params.help) {
         st_final_ch = STRINGTIE_2NDPASS.out.st2
 		merged_gtf4se_ch = MERGE_GTF.out.merged_gtf
 
+    	annotation_gtf_ch = MERGE_GTF.out.merged_gtf
+		gtf_path_ch = MERGE_GTF.out.merged_gtf.map { file_obj ->
+        	"${params.output_folder}/gtf/${file_obj.getName()}"
+    	)
+
     } else {
         st_final_ch = STRINGTIE_1STPASS.out.st1
 		merged_gtf4se_ch = Channel.value(gtf)
+
+    	annotation_gtf_ch = Channel.value(gtf)
+	    gtf_path_ch = Channel.value(params.gtf)
     }
 
 st_dirs_ch = st_final_ch
@@ -390,7 +388,7 @@ prepDE_input_ch = Channel.value(
         st_dirs_ch,
         BALLGOWN.out.norm_matrices,
         PREPDE.out.count_matrices,
-        gtf,
-        merged_gtf4se_ch
+    	annotation_gtf_ch,
+    	gtf_path_ch
     )
 }
