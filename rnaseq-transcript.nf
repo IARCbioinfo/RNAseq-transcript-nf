@@ -366,7 +366,7 @@ if (params.help) {
 
     } else {
         st_final_ch = STRINGTIE_1STPASS.out.st1
-		merged_gtf4se_ch = Channel.value(null)
+		merged_gtf4se_ch = Channel.value(gtf)
     }
 
 st_dirs_ch = st_final_ch
