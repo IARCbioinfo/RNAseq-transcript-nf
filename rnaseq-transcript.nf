@@ -357,7 +357,7 @@ if (params.help) {
     	annotation_gtf_ch = MERGE_GTF.out.merged_gtf
 		gtf_path_ch = MERGE_GTF.out.merged_gtf.map { file_obj ->
         	"${params.output_folder}/gtf/${file_obj.getName()}"
-    	)
+    	}
 
     } else {
         st_final_ch = STRINGTIE_1STPASS.out.st1
