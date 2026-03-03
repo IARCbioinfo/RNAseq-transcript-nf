@@ -46,7 +46,6 @@ def IARC_Header (){
 // --------------------------------------------------
 gtf = params.gtf ? file(params.gtf) : null
 if (!params.gtf) error "GTF file is required"
-prepDE_input = Channel.value(params.prepDE_input)
 
 // --------------------------------------------------
 // INPUT CHANNELS
@@ -345,6 +344,11 @@ if (params.help) {
    log.info "help:            ${params.help}"
 }
 
+prepDE_input_ch = Channel.value(
+    params.prepDE_input ?: "."
+)
+
+
 // RUN PROCESSES
 
     STRINGTIE_1STPASS(bam_files, gtf)
@@ -371,11 +375,8 @@ if (params.help) {
     }
 
  PREPDE(
-    st_final_ch
-        .map { it[0] }
-        .collect()
-        .map { dirs -> tuple(dirs, params.readlength) },
-    Channel.value(params.prepDE_input)
+    st_dirs_ch.map { dirs -> tuple(dirs, params.readlength) },
+    prepDE_input_ch
 )
 
    BALLGOWN(
