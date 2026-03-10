@@ -371,8 +371,9 @@ if (params.help) {
     }
 
 grouped = st_final_ch
-    .groupTuple(by: 1)
-    .map { readlength, dirs -> tuple(dirs, readlength) }
+    .map { dir, rl -> tuple(rl, dir) }
+    .groupTuple()
+    .map { rl, dirs -> tuple(dirs, rl) }
 
 st_dirs_ch = st_final_ch
     .map { it[0] }
