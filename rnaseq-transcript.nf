@@ -370,6 +370,10 @@ if (params.help) {
 	    gtf_path_ch = Channel.value(params.gtf)
     }
 
+grouped = st_final_ch
+    .groupTuple(by: 1)
+    .map { readlength, dirs -> tuple(dirs, readlength) }
+
 st_dirs_ch = st_final_ch
     .map { it[0] }
     .collect()
@@ -379,7 +383,7 @@ prepDE_input_ch = Channel.value(
 )
 
  PREPDE(
-    st_dirs_ch.map { dirs -> tuple(dirs, params.readlength) },
+    grouped,
     prepDE_input_ch
 )
 
