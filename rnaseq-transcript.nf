@@ -1,49 +1,292 @@
-#! /usr/bin/env nextflow
+#!/usr/bin/env nextflow
 
-// Copyright (C) 2017 IARC/WHO
+// Copyright (C) 2026 IARC/WHO
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+// See the GNU General Public License for more details <http://www.gnu.org/licenses/>.
 
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+nextflow.enable.dsl = 2
 
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+// --------------------------------------------------
+// PARAMETERS
+// --------------------------------------------------
 
 params.input_folder = '.'
 params.input_file = null
-params.output_folder= "."
+params.output_folder = "."
 params.mem  = 2
 params.cpu  = 2
 params.gtf  = null
-params.prepDE_input = 'NO_FILE'
+params.prepDE_input = null
 params.readlength = 75
 params.twopass  = null
 params.annot_organism = "Homo sapiens"
-params.annot_genome   = "Unknown" 
-params.annot_provider = "Unspecified" 
-params.annot_version = "Unspecified" 
+params.annot_genome   = "Unknown"
+params.annot_provider = "Unspecified"
+params.annot_version  = "Unspecified"
 params.ref = "Unspecified"
-
 params.help = null
 
+//Header for the IARC tools - logo generated using the following page : http://patorjk.com/software/taag  (ANSI logo generator)
+def IARC_Header (){
+     return  """
+#################################################################################
+# ██╗ █████╗ ██████╗  ██████╗██████╗ ██╗ ██████╗ ██╗███╗   ██╗███████╗ ██████╗  #
+# ██║██╔══██╗██╔══██╗██╔════╝██╔══██╗██║██╔═══██╗██║████╗  ██║██╔════╝██╔═══██╗ #
+# ██║███████║██████╔╝██║     ██████╔╝██║██║   ██║██║██╔██╗ ██║█████╗  ██║   ██║ #
+# ██║██╔══██║██╔══██╗██║     ██╔══██╗██║██║   ██║██║██║╚██╗██║██╔══╝  ██║   ██║ #
+# ██║██║  ██║██║  ██║╚██████╗██████╔╝██║╚██████╔╝██║██║ ╚████║██║     ╚██████╔╝ #
+# ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═════╝ ╚═╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝╚═╝      ╚═════╝  #
+# Nextflow pipelines for cancer genomics.########################################
+"""
+}
+
+// --------------------------------------------------
+// FILE DEFINITION
+// --------------------------------------------------
+gtf = params.gtf ? file(params.gtf) : null
+if (!params.gtf) error "GTF file is required"
+
+// --------------------------------------------------
+// INPUT CHANNELS
+// --------------------------------------------------
+
+if (params.input_file) {
+
+    bam_files = Channel
+        .fromPath(params.input_file)
+        .splitCsv(header: true, sep: '\t')
+        .map { row -> tuple(row.ID, row.readlength as Integer, file(row.bam)) }
+
+} else {
+	 bam_files = Channel
+    	.fromPath("${params.input_folder}/*.bam")
+    	.ifEmpty { error "No BAM files found" }
+    	.map { bam -> tuple(bam.baseName, params.readlength, bam) }
+    } 
+
+
+// --------------------------------------------------
+// PROCESSES
+// --------------------------------------------------
+
+process STRINGTIE_1STPASS {
+    cpus params.cpu
+    memory "${params.mem}G"
+    tag { sample_id }
+
+    input:
+    tuple val(sample_id), val(readlength), path(bam)
+    path gtf
+
+    output:
+    tuple path("${sample_id}"), val(readlength), emit: st1
+    path "*.log", emit: logs
+
+    publishDir params.output_folder, mode: 'copy',
+        saveAs: { f ->
+    def fname = f instanceof Path ? f.name : f.toString()
+    fname.endsWith('.log')
+        ? "logs/${fname}"
+        : params.twopass
+            ? "intermediate_files/sample_folders/ST1of2passes/${fname}"
+            : "intermediate_files/sample_folders/ST1pass/${fname}"
+}
+
+    script:
+
+	def opts
+	def log
+
+	if (params.twopass) {
+    	opts = "-o ${sample_id}/${sample_id}_1of2passes_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass1_gene_abund.tab"
+    	log  = "${sample_id}_1of2passes.log"
+	} else {
+    	opts = "-o ${sample_id}/${sample_id}_1pass_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass1_gene_abund.tab"
+    	log  = "${sample_id}_1pass.log"
+	}
+
+    """
+    stringtie ${opts} -p ${params.cpu} -G ${gtf} -l ${sample_id} ${bam}
+    cp .command.log ${log}
+    """
+}
+
+process MERGE_GTF {
+
+    cpus params.cpu
+    memory "${params.mem}G"
+
+    input:
+    path st_dirs
+    path gtf
+
+    output:
+    path "stringtie_merged.gtf", emit: merged_gtf
+    path "gffcmp_merged*", emit: gffcmp
+
+    publishDir "${params.output_folder}/gtf", mode: 'copy'
+
+    script:
+    """
+    ls */*_ST.gtf > mergelist.txt
+    stringtie --merge -p ${params.cpu} -G ${gtf} -o stringtie_merged.gtf mergelist.txt
+    gffcompare -r ${gtf} -G -o gffcmp_merged stringtie_merged.gtf
+    """
+}
+
+process STRINGTIE_2NDPASS {
+
+    cpus params.cpu
+    memory "${params.mem}G"
+    tag { sample_id }
+
+    input:
+    tuple val(sample_id), val(readlength), path(bam)
+    path merged_gtf
+    path gtf
+
+    output:
+    tuple path(sample_id), val(readlength), emit: st2
+    path "*.log", emit: logs
+
+	publishDir params.output_folder, mode: 'copy',
+    saveAs: { f ->
+
+        def fname = f instanceof Path ? f.name : f.toString()
+
+        fname.endsWith('.log')
+            ? "logs/${fname}"
+            : "intermediate_files/sample_folders/ST2pass/${fname}"
+    }
+
+    script:
+    """
+    stringtie -o ${sample_id}/${sample_id}_2pass_ST.gtf -e -B -A ${sample_id}/${sample_id}_pass2_gene_abund.tab \
+        -p ${params.cpu} -G ${merged_gtf} -l ${sample_id} ${bam}
+
+cp .command.log ${sample_id}_2pass.log
+    """
+}
+
+process PREPDE {
+
+    cpus params.cpu
+    memory "${params.mem}G"
+    tag { readlength }
+
+    input:
+    tuple path(st_dirs), val(readlength)
+    val prep_input
+
+    output:
+    path "*count_matrix*.csv", emit: count_matrices
+
+    publishDir "${params.output_folder}/intermediate_files/expr_matrices", mode: 'copy'
+
+    script:
+
+	def input_dir = (prep_input && prep_input != "null") ? prep_input : "."
+    def suffix    = params.twopass ? "_2pass" : ""
+
+    """
+	prepDE.py -i ${input_dir} -l ${readlength} \
+        -g gene_count_matrix${suffix}_l${readlength}.csv \
+        -t transcript_count_matrix${suffix}_l${readlength}.csv
+    """
+}
+
+process BALLGOWN {
+
+    cpus params.cpu
+    memory "${params.mem}G"
+
+    input:
+    path st_dirs
+
+    output:
+    path "*_matrix*.csv", emit: norm_matrices
+    path "*.rda", emit: rdata
+
+   publishDir params.output_folder, mode: 'copy',
+        saveAs: { f ->
+            def fname = f.toString().tokenize('/').last()
+            fname.endsWith('.csv') ?
+                "expr_matrices/${fname}" :
+                "Robjects/${fname}"
+        }
+
+    script:
+	def suffix = params.twopass ? "_2pass" : ""
+    """
+    Rscript ${baseDir}/bin/create_matrices.R ${suffix}
+    """
+}
+
+process SUMMARIZEDEXPERIMENT {
+
+    cpus params.cpu
+    memory "${params.mem}G"
+
+    input:
+    path st_dirs
+    path norm_matrices
+    path count_matrices
+    path annotation_gtf
+	val gtf_path
+
+    output:
+    path "*.rda"
+    path "*_matrix*.csv"
+
+    publishDir params.output_folder, mode: 'copy',
+        saveAs: { f ->
+            def fname = f.toString().tokenize('/').last()
+            fname.endsWith('.csv')
+                ? "expr_matrices/${fname}"
+                : "Robjects/${fname}"
+        }
+
+    script:
+	def suffix = params.twopass ? "_2pass" : "_1pass"
+
+    """
+    Rscript ${baseDir}/bin/create_summarizedExperiment.R \
+        ${annotation_gtf} \
+        "${params.annot_provider}" \
+        "${params.annot_version}" \
+        "${params.annot_genome}" \
+        "${params.annot_organism}" \
+        ${gtf_path} \
+        ${suffix} \
+        ${params.ref}
+    """
+}
+
+// --------------------------------------------------
+// WORKFLOW
+// --------------------------------------------------
+
+workflow {
+
+  		log.info IARC_Header()
+// --------------------------------------------------
+// INFO / HELP
+// --------------------------------------------------
+
 log.info ""
-log.info "-----------------------------------------------------------------"
-log.info "RNAseq-transcript-nf 2.2: gene- and transcript-level           "
-log.info "expression quantification from RNA sequencing data with StringTie"
-log.info "-----------------------------------------------------------------"
+log.info "----------------------------------------------------------------------------------------------------------------------"
+log.info "RNAseq-transcript-nf 2.2: gene- and transcript-level expression quantification from RNA sequencing data with StringTie"
+log.info "----------------------------------------------------------------------------------------------------------------------"
 log.info "Copyright (C) IARC/WHO"
 log.info "This program comes with ABSOLUTELY NO WARRANTY; for details see LICENSE"
-log.info "This is free software, and you are welcome to redistribute it"
-log.info "under certain conditions; see LICENSE for details."
-log.info "--------------------------------------------------------"
+log.info "This is free software, and you are welcome to redistribute it under certain conditions; see LICENSE for details."
+log.info "----------------------------------------------------------------------------------------------------------------------"
 log.info ""
+
+// --------------------------------------------------
+// INFO / HELP
+// --------------------------------------------------
 
 if (params.help) {
     log.info "--------------------------------------------------------"
@@ -94,237 +337,66 @@ if (params.help) {
    log.info "help:            ${params.help}"
 }
 
-if(params.input_file){
-	bam_files = Channel.fromPath("${params.input_file}")
-     	   .splitCsv( header: true, sep: '\t', strip: true )
-	       .map { row -> [ row.ID , row.readlength , file(row.bam) ] }
-}else{
-if (file(params.input_folder).listFiles().findAll { it.name ==~ /.*bam/ }.size() > 0){
-       println "BAM files found, proceed with transcript quantification"; mode ='bam'
-       bam_files = Channel.fromPath( params.input_folder+'/*.bam')
-                          .map{ path -> [ path.name.replace(".bam",""), params.readlength, path ] }
-			  //.view()
-}else{
-       println "ERROR: input folder contains no fastq nor BAM files"; System.exit(1)
-}
-}
+// RUN PROCESSES
 
-gtf = file(params.gtf)
-bam_files.into { bam_files_41stpass; bam_files_42ndpass }
+    STRINGTIE_1STPASS(bam_files, gtf)
 
-//input file for the prepDE python script
-ch_prepDE_input = file(params.prepDE_input)
+    if (params.twopass) {
 
-// 1st pass identifies new transcripts for each BAM file
-process StringTie1stpass {
-	cpus params.cpu
-	memory params.mem+'G'
-	tag { file_tag }
+        MERGE_GTF(
+    		STRINGTIE_1STPASS.out.st1
+        	.map { it[0] }
+        	.collect(),
+			gtf)
 
-	input:
-	set file_tag, val(readlength), file(bam) from bam_files_41stpass
-	file gtf
+        STRINGTIE_2NDPASS(
+            bam_files,
+            MERGE_GTF.out.merged_gtf,
+            gtf)
+
+        st_final_ch = STRINGTIE_2NDPASS.out.st2
+		merged_gtf4se_ch = MERGE_GTF.out.merged_gtf
+
+    	annotation_gtf_ch = MERGE_GTF.out.merged_gtf
+		gtf_path_ch = MERGE_GTF.out.merged_gtf.map { file_obj ->
+        	"${params.output_folder}/gtf/${file_obj.getName()}"
+    	}
+
+    } else {
+        st_final_ch = STRINGTIE_1STPASS.out.st1
+		merged_gtf4se_ch = Channel.value(gtf)
+
+    	annotation_gtf_ch = Channel.value(gtf)
+	    gtf_path_ch = Channel.value(params.gtf)
+    }
+
+grouped = st_final_ch
+    .map { dir, rl -> tuple(rl, dir) }
+    .groupTuple()
+    .map { rl, dirs -> tuple(dirs, rl) }
+
+st_dirs_ch = st_final_ch
+    .map { it[0] }
+    .collect()
+
+prepDE_input_ch = Channel.value(
+    params.prepDE_input ?: "."
+)
+
+ PREPDE(
+    grouped,
+    prepDE_input_ch
+)
+
+   BALLGOWN(
+    st_dirs_ch
+)
 	
-	output:
-	set file("${file_tag}"), val(readlength) into ST_out1pass
-	file "*.log" into stringtie_log
-	publishDir params.output_folder, mode: 'copy', saveAs: {filename ->
-            if (filename.indexOf(".log") > 0){ 
-				"logs/$filename"
-			}else{
-				if(params.twopass) "intermediate_files/sample_folders/ST1of2passes/$filename"
-				else "intermediate_files/sample_folders/ST1pass/$filename"
-			}
-	}
-
-	shell:
-	if(params.twopass){
-	  STopts="-o ${file_tag}_1of2passes_ST.gtf"
-	  logfile="${file_tag}_1of2passes.log"
-	}else{
-	  STopts="-o ${file_tag}_1pass_ST.gtf -e -B -A ${file_tag}_pass1_gene_abund.tab "
-	  logfile="${file_tag}_1pass.log"
-	}
-    	'''
-    	stringtie !{STopts} -p !{params.cpu} -G !{gtf} -l !{file_tag} !{bam}
-		mkdir !{file_tag}
-		tabs=(*tab)
-		if [ -f ${tabs[0]} ]; then mv *tab !{file_tag}/; fi 
-		mv *_ST.gtf !{file_tag}/
-		cp .command.log !{logfile}
-    	'''
-}
-
-if(params.twopass){
-// Merges the list of transcripts of each BAM file
-process mergeGTF {
-	cpus params.cpu
-	memory params.mem+'G'
-	tag { "merge" }
-
-	input:
-	file gtfs from ST_out1pass.collect()
-	file gtf
-
-	output: 
-	file "stringtie_merged.gtf" into merged_gtf, merged_gtf4SE
-	file("gffcmp_merged*") into gffcmp_output
-	publishDir "${params.output_folder}/gtf", mode: 'copy', saveAs: {filename ->
-            if (filename.indexOf("gffcmp") == 0){ 
-				"gffcmp/$filename"
-			}else{
-				"$filename"
-			}
-	}
-	
-	shell:
-	'''
-	ls */*_ST.gtf > mergelist.txt
-	stringtie --merge -p !{params.cpu} -G !{gtf} -o stringtie_merged.gtf mergelist.txt
-	gffcompare -r !{gtf} -G -o gffcmp_merged stringtie_merged.gtf
-	'''
-}
-
-// Quantifies transcripts identified in 1st pass in each sample
-process StringTie2ndpass {
-	cpus params.cpu
-	memory params.mem+'G'
-	tag { file_tag }
-
-	input:
-	set file_tag, val(readlength), file(bam) from bam_files_42ndpass
-	file merged_gtf
-	file gtf
-
-	output: 
-	set file("${file_tag}"), val(readlength) into ST_out2
-	file "*.log" into stringtie_log_2pass
-	publishDir params.output_folder, mode: 'copy', saveAs: {filename ->
-        if (filename.indexOf(".log") > 0) "logs/$filename"
-        else "intermediate_files/sample_folders/ST2pass/$filename"
-	}
-
-	shell:
-	'''
-	stringtie -o !{file_tag}_2pass_ST.gtf -e -B -A !{file_tag}_pass2_gene_abund.tab -p !{params.cpu} -G !{merged_gtf} !{bam}
-	mkdir !{file_tag}
-	mv *tab !{file_tag}/
-	mv *_2pass_ST.gtf !{file_tag}/
-	cp .command.log !{file_tag}_2pass.log
-	'''
-}
-}else{
-	ST_out2 = ST_out1pass
-	merged_gtf4SE = file('NO_FILE')
-}//end if twopass
-ST_out4prepDE = Channel.create()
-ST_out4bg = Channel.create()
-ST_out4SE = Channel.create()
-ST_out4group = Channel.create()
-
-ST_out2.into( ST_out4group, ST_out4bg, ST_out4SE)
-ST_out4prepDE = ST_out4group.groupTuple(by:1)
-
-process prepDE {
-	cpus params.cpu
-	memory params.mem +'G'
-	tag { readlength }
-
-	input:
-	set file(ST_outs), val(readlength) from ST_out4prepDE
-	file samplenames from ch_prepDE_input
-
-	output: 
-	file("*count_matrix*.csv") into quantif_count_matrices
-	publishDir "${params.output_folder}/intermediate_files/expr_matrices", mode: 'copy'
-
-	shell:
-	input = samplenames.name != 'NO_FILE' ? "$samplenames" : '.'
-	suffix = params.twopass == null ? "" : '_2pass'
-	'''
-	prepDE.py -i !{input} -l !{readlength} -g gene_count_matrix!{suffix}_l!{readlength}.csv -t transcript_count_matrix!{suffix}_l!{readlength}.csv
-	'''
-}
-
-process ballgown_create {
-	cpus params.cpu
-	memory params.mem +'G'
-
-	input:
-	file ST_outs from ST_out4bg.collect()
-
-	output: 
-	file("*_matrix*.csv") into quantif_norm_matrices
-	file("*.rda") into rdata2pass
-	publishDir "${params.output_folder}", mode: 'copy', saveAs: {filename ->
-        if (filename.indexOf(".csv") > 0) "expr_matrices/$filename"
-        else "Robjects/$filename"
-	}
-	
-	shell:
-	suffix = params.twopass == null ? " " : '_2pass'
-	'''
-	Rscript !{baseDir}/bin/create_matrices.R !{suffix}
-	'''
-}
-
-process SummarizedExperiment_create {
-	cpus params.cpu
-	memory params.mem +'G'
-
-	input:
-	file ST_outs from ST_out4SE.collect()
-	file quantif_norm_matrices
-	file count_mats from quantif_count_matrices.collect()
-	file gtf
-	file merged_gtf4SE
-
-	output: 
-	file("*.rda")
-	file("*_matrix*.csv")
-	publishDir "${params.output_folder}", mode: 'copy', saveAs: {filename ->
-        if (filename.indexOf(".csv") > 0) "expr_matrices/$filename"
-        else "Robjects/$filename"
-	}
-	
-	shell:
-	suffix = params.twopass == null ? "_1pass" : '_2pass'
-	if(merged_gtf4SE.name =='NO_FILE'){
-		gtf2use=gtf
-		gtf_path=params.gtf
-	}else{
-		gtf2use=merged_gtf4SE
-		gtf_path="${params.output_folder}/gtf/"+merged_gtf4SE.name
-	}
-	'''
-	if [ "!{params.annot_genome}" == "Unknown" ]
-		then
-			if grep -q -E "GRCh37|hg19" !{gtf}
-				then genome=hg19
-			else 
-				genome=hg38
-		fi
-	else
-		genome=!{params.annot_genome}
-	fi
-	if [ "!{params.annot_provider}" == "Unspecified" ]
-		then
-			provider="Unspecified"
-			if [ `cat !{gtf} | grep provider | awk '{print $2}'` != "" ]
-				then provider=`cat !{gtf} | grep provider | awk '{print $2}'`
-			fi	
-	else
-		provider=!{params.annot_provider}
-	fi
-	if [ "!{params.annot_version}" == "Unspecified" ]
-		then
-			version="Unspecified"
-			if [ `cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'` != "" ]
-				then version=`cat !{gtf} | grep version | awk '{for(i=1;i<=NF;i++)if($i=="version")print $(i+1)}'`
-			fi
-	else
-		version=!{params.annot_version}
-	fi
-	Rscript !{baseDir}/bin/create_summarizedExperiment.R !{gtf2use} ${provider} ${version} ${genome} "!{params.annot_organism}" !{gtf_path} !{suffix} !{params.ref}
-	'''
+	SUMMARIZEDEXPERIMENT(
+        st_dirs_ch,
+        BALLGOWN.out.norm_matrices,
+        PREPDE.out.count_matrices,
+    	annotation_gtf_ch,
+    	gtf_path_ch
+    )
 }
